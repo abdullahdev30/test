@@ -14,26 +14,9 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleGoogleLogin = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch("http://135.181.242.234:7860/auth/google", {
-        method: "GET",
-        headers: { "accept": "application/json" },
-      });
-      const data = await response.json();
-      if (response.ok && data.url) {
-        window.location.href = data.url;
-      } else {
-        setError("Could not initialize Google Login.");
-        setLoading(false);
-      }
-    } catch (err) {
-      setError("Network error connecting to Google Auth.");
-      setLoading(false);
-    }
-  };
+  const handleGoogleLogin = () => {
+  window.location.href = "https://wenona-polydisperse-aracely.ngrok-free.dev/auth/google";
+};
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
@@ -41,12 +24,13 @@ const LoginPage = () => {
     setError(null);
 
     try {
-      const response = await fetch("http://135.181.242.234:7860/auth/login", {
+      const response = await fetch("https://wenona-polydisperse-aracely.ngrok-free.dev/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "accept": "application/json",
         },
+        credentials: "include",
         body: JSON.stringify({
           email: email,
           password: password,
