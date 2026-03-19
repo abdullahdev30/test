@@ -1,27 +1,20 @@
 "use client"
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { FcGoogle } from "react-icons/fc";
 import { 
   Mail, Lock, ArrowRight, CheckCircle2, 
   ShieldCheck, RefreshCw, ChevronLeft, 
-  Loader2, Eye, EyeOff, User 
+  Loader2, Eye, EyeOff 
 } from 'lucide-react';
 
-
-
-
-  const handleGoogleLogin = () => {
-  window.location.href = "https://wenona-polydisperse-aracely.ngrok-free.dev/auth/google";
-};
-
-
 const SignupFlow = () => {
-  const [step, setStep] = useState('form'); // 'form' | 'otp' | 'success'
+  const router = useRouter();
+  const [step, setStep] = useState('form'); 
   const [loading, setLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
   
-  // Form States mapped to your API Schema
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -31,9 +24,6 @@ const SignupFlow = () => {
   });
   const [otp, setOtp] = useState('');
 
-  const API_BASE = "http://135.181.242.234:7860";
-
-  // Handle Resend Countdown
   useEffect(() => {
     if (resendTimer > 0) {
       const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
@@ -41,12 +31,12 @@ const SignupFlow = () => {
     }
   }, [resendTimer]);
 
-  const handleChange = (e:any) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // 1. POST /auth/signup
-  const handleSignup = async (e:any) => {
+  // 1. SIGNUP
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.password !== formData.confirmPassword) {
       alert("Passwords do not match!");
@@ -55,59 +45,57 @@ const SignupFlow = () => {
 
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/auth/signup`, {
+      const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          email: formData.email,
-          password: formData.password,
-          confirmPassword: formData.confirmPassword,
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone // Auto-detect e.g. "Asia/Karachi"
+          ...formData,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
         }),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Signup failed");
+      if (!res.ok) throw new Error(data.error || "Signup failed");
 
       setStep('otp');
       setResendTimer(60);
-    } catch (err) {
-      alert((err as Error).message || "Connection error");
+    } catch (err: any) {
+      alert(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // 2. POST /auth/verify-email
-  const handleVerify = async (e:any) => {
+  // 2. VERIFY
+  const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/auth/verify-email`, {
+      const res = await fetch("/api/auth/verify-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          email: formData.email, 
-          otp: otp 
-        }),
+        body: JSON.stringify({ email: formData.email, otp }),
       });
 
-      if (!res.ok) throw new Error("Invalid or expired OTP");
+      if (res.ok) {     router.push('/dashboard'); }
+      // Redirect on success
+else{
+        const data = await res.json();
+        throw new Error(data.error || "Invalid OTP");
+      }
       setStep('success');
-    } catch (err) {
-      alert((err as Error).message);
+    } catch (err: any) {
+      alert(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // 3. POST /auth/resend-verification
+  // 3. RESEND
   const handleResend = async () => {
     if (resendTimer > 0) return;
     try {
-      const res = await fetch(`${API_BASE}/auth/resend-verification`, {
+      const res = await fetch("/api/auth/resend-verification", { // Create this route if needed
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: formData.email }),
@@ -123,9 +111,8 @@ const SignupFlow = () => {
 
   return (
     <section className="min-h-screen flex items-center justify-center bg-background p-4 text-txt-primary">
-      <div className="w-full max-w-md bg-bg-primary rounded-3xl shadow-sm border border-background p-8 md:p-10 z-10 transition-all duration-500">
+      <div className="w-full max-w-md bg-bg-primary rounded-3xl shadow-sm border border-background p-8 md:p-10 z-10">
         
-        {/* --- STEP 1: SIGNUP FORM --- */}
         {step === 'form' && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="text-center mb-8">
@@ -138,50 +125,50 @@ const SignupFlow = () => {
                 <input 
                   name="firstName" placeholder="First Name" required 
                   onChange={handleChange} 
-                  className="w-full px-4 py-3 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all" 
+                  className="w-full px-4 py-3 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary" 
                 />
                 <input 
                   name="lastName" placeholder="Last Name" required 
                   onChange={handleChange} 
-                  className="w-full px-4 py-3 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all" 
+                  className="w-full px-4 py-3 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary" 
                 />
               </div>
 
-              <div className="relative group">
+              <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-txt-secondary" />
                 <input 
                   name="email" type="email" placeholder="Email Address" required 
                   onChange={handleChange} 
-                  className="w-full pl-12 pr-4 py-3 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all" 
+                  className="w-full pl-12 pr-4 py-3 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary" 
                 />
               </div>
 
-              <div className="relative group">
+              <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-txt-secondary" />
                 <input 
                   name="password" 
                   type={showPassword ? "text" : "password"} 
                   placeholder="Password" required 
                   onChange={handleChange} 
-                  className="w-full pl-12 pr-12 py-3 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all" 
+                  className="w-full pl-12 pr-12 py-3 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary" 
                 />
                 <button 
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-txt-secondary hover:text-primary transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-txt-secondary hover:text-primary"
                 >
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
 
               <div className="relative">
-                 <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-txt-secondary" />
-                 <input 
+                <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-txt-secondary" />
+                <input 
                   name="confirmPassword" 
                   type={showPassword ? "text" : "password"} 
                   placeholder="Confirm Password" required 
                   onChange={handleChange} 
-                  className="w-full pl-12 pr-4 py-3 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all" 
+                  className="w-full pl-12 pr-4 py-3 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary" 
                 />
               </div>
 
@@ -201,21 +188,19 @@ const SignupFlow = () => {
             </div>
 
             <button 
-                        type="button" 
-                        onClick={handleGoogleLogin} 
-                        disabled={loading}
-                        className="w-full flex items-center justify-center gap-3 py-3 px-4 border rounded-xl transition-colors font-medium text-txt-primary hover:bg-background active:scale-95 "
-                      >
-                        <FcGoogle className="w-6 h-6 sm:w-8 sm:h-8" />
-                        <span className="text-sm sm:text-base">{loading ? "Connecting..." : "Continue with Google"}</span>
-                      </button>
+              type="button" 
+              onClick={() => window.location.href = "https://wenona-polydisperse-aracely.ngrok-free.dev/auth/google"} 
+              className="w-full flex items-center justify-center gap-3 py-3 px-4 border rounded-xl font-medium text-txt-primary hover:bg-background"
+            >
+              <FcGoogle className="w-6 h-6" />
+              <span>Continue with Google</span>
+            </button>
           </div>
         )}
 
-        {/* --- STEP 2: OTP VERIFICATION --- */}
         {step === 'otp' && (
           <div className="animate-in fade-in zoom-in-95 duration-500 space-y-6">
-            <button onClick={() => setStep('form')} className="flex items-center text-txt-secondary hover:text-primary transition-colors text-sm">
+            <button onClick={() => setStep('form')} className="flex items-center text-txt-secondary text-sm">
                <ChevronLeft className="w-4 h-4 mr-1" /> Back
             </button>
             <div className="text-center">
@@ -227,7 +212,7 @@ const SignupFlow = () => {
               <input 
                 type="text" maxLength={6} value={otp} required placeholder="000000"
                 onChange={(e) => setOtp(e.target.value)}
-                className="w-full text-center text-4xl tracking-[1rem] font-bold py-5 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary"
+                className="w-full text-center text-4xl tracking-[0.5rem] font-bold py-5 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary"
               />
               <button disabled={loading} className="w-full bg-primary text-white font-bold py-4 rounded-2xl transition-all">
                 {loading ? <Loader2 className="animate-spin mx-auto" /> : "Verify & Continue"}
@@ -236,7 +221,7 @@ const SignupFlow = () => {
             <button 
               onClick={handleResend} 
               disabled={resendTimer > 0}
-              className={`flex items-center mx-auto font-bold text-sm transition-all ${resendTimer > 0 ? 'text-txt-secondary cursor-not-allowed' : 'text-primary hover:underline'}`}
+              className={`flex items-center mx-auto font-bold text-sm ${resendTimer > 0 ? 'text-txt-secondary' : 'text-primary'}`}
             >
               <RefreshCw className={`w-4 h-4 mr-2 ${resendTimer > 0 ? '' : 'animate-pulse'}`} />
               {resendTimer > 0 ? `Resend in ${resendTimer}s` : "Resend Code"}
@@ -244,13 +229,15 @@ const SignupFlow = () => {
           </div>
         )}
 
-        {/* --- STEP 3: SUCCESS --- */}
         {step === 'success' && (
           <div className="text-center py-6 animate-in zoom-in-90 duration-500">
             <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-6" />
             <h1 className="text-3xl font-bold mb-2">Verified!</h1>
-            <p className="text-txt-secondary mb-8 leading-relaxed">Your account is ready. Welcome to the workspace.</p>
-            <button className="w-full bg-txt-primary text-bg-primary font-bold py-4 rounded-2xl hover:opacity-90">
+            <p className="text-txt-secondary mb-8 leading-relaxed">Your account is ready.</p>
+            <button 
+              onClick={() => router.push('/dashboard')}
+              className="w-full bg-txt-primary text-bg-primary font-bold py-4 rounded-2xl hover:opacity-90"
+            >
               Go to Dashboard
             </button>
           </div>
