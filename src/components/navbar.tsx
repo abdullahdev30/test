@@ -1,53 +1,26 @@
 "use client";
 import React, { useState } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { Search, Bell, Settings, Menu, X, Sparkles } from "lucide-react";
 import ThemeToggle from "./theme_provider";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const pathname = usePathname();
 
-  const navLinks = [
-    { name: "Dashboard", path: "/" },
-    { name: "Schedules", path: "/schedules" },
-    { name: "Analytics", path: "/analytics" },
-    { name: "AI Lab", path: "/ai-lab" },
-  ];
 
   return (
-    <nav className="bg-bg-primary border-b relative">
-      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+    <nav 
+      className="relative z-50 backdrop-blur-md"
+      style={{
+        backgroundColor: 'color-mix(in srgb, var(--bg-primary) 80%, transparent)',
+        borderBottom: '1px solid rgba(0,0,0,0.1)',
+        padding: '0 calc(1rem * 1.5)'
+      }}
+    >
+      <div className="max-w-7xl mx-auto flex items-center justify-between" style={{ height: 'calc(1rem * 4)' }}>
         
-        {/* Logo */}
-        <div className="flex items-center gap-2">
-          <div className="bg-primary p-1.5 rounded-lg text-white">
-            <Sparkles size={20} fill="currentColor" />
-          </div>
-          <span className="font-semibold text-xl">Social AI</span>
-        </div>
+       
 
-        {/* Desktop Links */}
-        <div className="hidden md:flex items-center ml-10 space-x-8">
-          {navLinks.map((link) => {
-            const isActive = pathname === link.path;
 
-            return (
-              <Link
-                key={link.name}
-                href={link.path}
-                className={`text-sm font-medium transition-all pb-1 ${
-                  isActive
-                    ? "text-primary border-b-2 border-primary"
-                    : "text-txt-primary hover:text-primary/80"
-                }`}
-              >
-                {link.name}
-              </Link>
-            );
-          })}
-        </div>
 
         {/* Right Section */}
         <div className="flex items-center flex-1 justify-end gap-3 md:gap-4">
@@ -64,21 +37,15 @@ const Navbar = () => {
 
           <ThemeToggle />
 
-          <button className="p-2 hover:bg-bg-secondary rounded-full">
+          <button className="p-2 hover:bg-secondary rounded-full">
             <Bell size={20} />
           </button>
 
-          <button className="p-2 hover:bg-bg-secondary rounded-full">
+          <button className="p-2 hover:bg-secondary rounded-full">
             <Settings size={20} />
           </button>
 
-          {/* Avatar */}
-          <div className="w-8 h-8 rounded-full overflow-hidden border cursor-pointer">
-            <img
-              src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"
-              alt="User"
-            />
-          </div>
+
 
           {/* Mobile Toggle */}
           <button
@@ -117,27 +84,7 @@ const Navbar = () => {
             </button>
           </div>
 
-          {/* Links */}
-          <div className="flex flex-col gap-3">
-            {navLinks.map((link) => {
-              const isActive = pathname === link.path;
 
-              return (
-                <Link
-                  key={link.name}
-                  href={link.path}
-                  onClick={() => setIsOpen(false)}
-                  className={`text-lg font-medium px-4 py-2 rounded-lg transition ${
-                    isActive
-                      ? "bg-primary/10 text-primary"
-                      : "text-txt-primary hover:bg-bg-secondary"
-                  }`}
-                >
-                  {link.name}
-                </Link>
-              );
-            })}
-          </div>
 
           {/* Mobile Search */}
           <div className="mt-auto pt-6 border-t">

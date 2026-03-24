@@ -17,7 +17,7 @@ export default function DashboardPage() {
           <p className="text-text-secondary mt-2 font-medium">Welcome back, here's what's happening with your socials.</p>
         </div>
         <div className="flex items-center gap-4">
-          <button className="flex items-center gap-2 px-6 py-3.5 border-2 border-text-primary/10 bg-bg-primary rounded-2xl font-bold text-text-primary hover:bg-text-primary/5 transition-all text-sm shadow-sm">
+          <button className="flex items-center gap-2 px-6 py-3.5 border-2 border-text-primary/10 bg-bg-primary rounded-2xl font-bold text-text-primary hover:bg-secondary transition-all text-sm shadow-sm">
             <Plus size={20} /> Create Post
           </button>
           <button className="flex items-center gap-2 px-6 py-3.5 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/25 hover:scale-[1.02] transition-all text-sm">
@@ -107,8 +107,8 @@ function StatBox({ icon, label, value, trend, color }: any) {
 
 function PostItem({ platform, time, title, tagClass }: any) {
   return (
-    <div className="flex items-center gap-5 p-4 rounded-2xl border border-text-primary/5 hover:bg-text-primary/5 transition-all cursor-pointer group">
-      <div className="w-16 h-16 bg-text-primary/5 rounded-2xl overflow-hidden flex-shrink-0 border border-text-primary/10"></div>
+    <div className="flex items-center gap-5 p-4 rounded-2xl border border-text-primary/10 hover:bg-secondary transition-all cursor-pointer group">
+      <div className="w-16 h-16 bg-secondary rounded-2xl overflow-hidden flex-shrink-0 border border-text-primary/10"></div>
       <div className="flex-1">
         <div className="flex items-center gap-3 mb-1">
           <span className={`text-[9px] font-black px-2 py-0.5 rounded-md ${tagClass}`}>{platform}</span>
@@ -126,7 +126,7 @@ function PostItem({ platform, time, title, tagClass }: any) {
 
 function QuickAction({ icon, label }: any) {
   return (
-    <button className="flex flex-col items-center justify-center p-5 rounded-[24px] border border-text-primary/5 bg-bg-primary hover:border-primary/30 hover:bg-primary/5 transition-all group">
+    <button className="flex flex-col items-center justify-center p-5 rounded-[24px] border border-text-primary/10 bg-bg-primary hover:border-primary/30 hover:bg-primary/5 transition-all group">
       <div className="text-primary mb-3 group-hover:scale-110 transition-transform">{icon}</div>
       <span className="text-[10px] font-bold text-text-primary leading-tight uppercase tracking-tight text-center">{label}</span>
     </button>

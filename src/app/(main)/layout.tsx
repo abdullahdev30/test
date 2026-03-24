@@ -9,19 +9,14 @@ export default function MainLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [isExpanded, setIsExpanded] = useState(true);
-
-  const toggleSidebar = () => setIsExpanded(!isExpanded);
-
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar isExpanded={isExpanded} toggleSidebar={toggleSidebar} />
+    <Sidebar>
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
-        <Navbar toggleSidebar={toggleSidebar} />
+        <Navbar />
         <main className="flex-1 overflow-y-auto bg-background transition-colors duration-300">
           {children}
         </main>
       </div>
-    </div>
+    </Sidebar>
   );
 }

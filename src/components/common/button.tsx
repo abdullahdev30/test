@@ -26,8 +26,8 @@ const Button = ({
   const variants = {
     primary: "bg-primary text-white hover:bg-primary/90 shadow-md shadow-primary/20",
     secondary: "bg-[#F3E8FF] text-primary hover:bg-[#E9D5FF]",
-    outline: "bg-transparent border-2 border-gray-100 text-gray-600 hover:border-primary hover:text-primary",
-    ghost: "bg-transparent text-gray-500 hover:bg-gray-50",
+    outline: "bg-transparent border-2 border-text-secondary/10 text-text-secondary hover:border-primary hover:text-primary",
+    ghost: "bg-transparent text-text-secondary hover:bg-text-secondary/5",
     danger: "bg-red-50 text-red-600 hover:bg-red-100 border border-red-100",
   };
 

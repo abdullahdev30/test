@@ -3,19 +3,18 @@
 import React, { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { FcGoogle } from "react-icons/fc";
-import { Eye, EyeOff } from "lucide-react"; 
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 const LoginPage = () => {
   const router = useRouter();
-  
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false); 
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleGoogleLogin = () => {
-    // Keep your external Google Auth link
     window.location.href = "https://wenona-polydisperse-aracely.ngrok-free.dev/auth/google";
   };
 
@@ -25,23 +24,39 @@ const LoginPage = () => {
     setError(null);
 
     try {
-      // Call OUR internal API Route, not the 135.x.x.x IP directly
-      const response = await fetch("/api/auth/login", {
+      const response = await fetch("http://135.181.242.234:7860/auth/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          deviceId: "web-chrome-device-001" 
+        }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        // Successfully set cookie on server side, now redirect
-        router.push("/dashboard"); 
+        // --- 1. STORE IN LOCALSTORAGE (For easy client-side use) ---
+        localStorage.setItem("accessToken", data.accessToken);
+        localStorage.setItem("refreshToken", data.refreshToken);
+        
+        // --- 2. STORE IN COOKIES (For Middleware & Persistence) ---
+        // Setting max-age to 7 days (604800 seconds)
+        const cookieBase = "path=/; max-age=604800; samesite=lax";
+        document.cookie = `accessToken=${data.accessToken}; ${cookieBase}`;
+        document.cookie = `refreshToken=${data.refreshToken}; ${cookieBase}`;
+
+        // --- 3. REDIRECT ---
+        router.push("/dashboard");
       } else {
-        setError(data.error || "Invalid login credentials");
+        setError(data.message || "Invalid login credentials");
       }
     } catch (err) {
-      setError("Something went wrong. Please try again.");
+      setError("Failed to connect to server. Please check your connection.");
     } finally {
       setLoading(false);
     }
@@ -61,9 +76,9 @@ const LoginPage = () => {
           </div>
         )}
 
-        <button 
-          type="button" 
-          onClick={handleGoogleLogin} 
+        <button
+          type="button"
+          onClick={handleGoogleLogin}
           className="w-full flex items-center justify-center gap-3 py-3 px-4 border rounded-xl transition-colors font-medium text-txt-primary hover:bg-background active:scale-95 mb-8"
         >
           <FcGoogle className="w-6 h-6" />
@@ -90,11 +105,11 @@ const LoginPage = () => {
           <div>
             <div className="flex justify-between items-center mb-2">
               <label className="text-sm font-bold text-txt-primary">Password</label>
-              <a href="/forgot_password" className="text-xs font-bold text-primary hover:underline">Forgot?</a>
+              <a href="/forgot-password" className="text-xs font-bold text-primary hover:underline">Forgot?</a>
             </div>
             <div className="relative">
               <input
-                type={showPassword ? "text" : "password"} 
+                type={showPassword ? "text" : "password"}
                 required value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-4 py-3 bg-background border border-bg-primary rounded-xl focus:ring-2 focus:ring-primary outline-none"
@@ -113,15 +128,16 @@ const LoginPage = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-4 bg-primary text-white rounded-xl font-bold text-lg hover:scale-[1.02] transition-all disabled:opacity-70"
+            className="w-full py-4 bg-primary text-white rounded-xl font-bold text-lg hover:scale-[1.02] transition-all disabled:opacity-70 flex items-center justify-center"
           >
+            {loading ? <Loader2 className="animate-spin mr-2" size={20} /> : null}
             {loading ? "Logging in..." : "Log In"}
           </button>
         </form>
 
         <div className="mt-8 text-center">
           <p className="text-sm text-txt-secondary">
-            Don't have an account? <a href="/signup" className="text-primary font-bold hover:underline">Sign up</a>
+            Don't have an account? <a href="/register" className="text-primary font-bold hover:underline">Sign up</a>
           </p>
         </div>
       </div>

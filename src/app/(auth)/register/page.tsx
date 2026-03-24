@@ -1,4 +1,5 @@
-"use client"
+"use client";
+
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { FcGoogle } from "react-icons/fc";
@@ -24,6 +25,8 @@ const SignupFlow = () => {
   });
   const [otp, setOtp] = useState('');
 
+  const BASE_URL = "http://135.181.242.234:7860";
+
   useEffect(() => {
     if (resendTimer > 0) {
       const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
@@ -35,7 +38,7 @@ const SignupFlow = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // 1. SIGNUP
+  // 1. SIGNUP INTEGRATION
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.password !== formData.confirmPassword) {
@@ -45,17 +48,20 @@ const SignupFlow = () => {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/signup", {
+      const res = await fetch(`${BASE_URL}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...formData,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          password: formData.password,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
         }),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Signup failed");
+      if (!res.ok) throw new Error(data.message || "Signup failed");
 
       setStep('otp');
       setResendTimer(60);
@@ -66,24 +72,28 @@ const SignupFlow = () => {
     }
   };
 
-  // 2. VERIFY
+  // 2. VERIFY INTEGRATION
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/verify-email", {
+      const res = await fetch(`${BASE_URL}/auth/verify-email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: formData.email, otp }),
       });
 
-      if (res.ok) {     router.push('/dashboard'); }
-      // Redirect on success
-else{
-        const data = await res.json();
-        throw new Error(data.error || "Invalid OTP");
+      const data = await res.json();
+
+      if (res.ok) { 
+        // Save tokens to cookies for persistence (Later Use)
+        document.cookie = `accessToken=${data.accessToken}; path=/; max-age=604800; samesite=lax`;
+        document.cookie = `refreshToken=${data.refreshToken}; path=/; max-age=604800; samesite=lax`;
+        
+        setStep('success');
+      } else {
+        throw new Error(data.message || "Invalid OTP");
       }
-      setStep('success');
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -91,11 +101,11 @@ else{
     }
   };
 
-  // 3. RESEND
+  // 3. RESEND INTEGRATION
   const handleResend = async () => {
     if (resendTimer > 0) return;
     try {
-      const res = await fetch("/api/auth/resend-verification", { // Create this route if needed
+      const res = await fetch(`${BASE_URL}/auth/resend-verification`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: formData.email }),
@@ -103,6 +113,9 @@ else{
       if (res.ok) {
         setResendTimer(60);
         alert("Verification code resent!");
+      } else {
+        const data = await res.json();
+        alert(data.message || "Failed to resend code");
       }
     } catch (err) {
       alert("Failed to resend code");
