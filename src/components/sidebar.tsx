@@ -1,11 +1,13 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useTransition } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Calendar, Briefcase,
   Settings, LogOut, ChevronLeft, ChevronRight, Loader2, Link2
 } from 'lucide-react';
+import { useUser } from '@/hooks/useUser';
+import { logout } from '@/lib/auth';
 
 const menuItems = [
   { name: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
@@ -15,74 +17,18 @@ const menuItems = [
   { name: 'Settings', icon: Settings, href: '/settings' },
 ];
 
-const BASE_URL = "http://135.181.242.234:7860";
-
 export default function Sidebar({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [isPending, startTransition] = useTransition();
+  const { user } = useUser();
 
-  // Helper: Get Token from cookies (standard for your setup)
-  const getAuthToken = () => {
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; accessToken=`);
-    if (parts.length === 2) return parts.pop()?.split(';').shift();
-    return "";
-  };
-
-  // 1. FETCH CURRENT USER DATA (GET /auth/me)
-  useEffect(() => {
-    const fetchUser = async () => {
-      const token = getAuthToken();
-      if (!token) return;
-
-      try {
-        const res = await fetch(`${BASE_URL}/auth/me`, {
-          method: 'GET',
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setUser(data);
-        }
-      } catch (err) {
-        console.error("Sidebar user fetch failed", err);
-      }
-    };
-    fetchUser();
-  }, []);
-
-  // 2. LOGOUT IMPLEMENTATION (POST /auth/logout)
-  const handleLogout = async () => {
-    if (isLoggingOut) return;
-    setIsLoggingOut(true);
-
-    try {
-      const token = getAuthToken();
-
-      // Call the backend to invalidate the session
-      await fetch(`${BASE_URL}/auth/logout`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-      });
-
-      // CLEAN UP: Remove cookies and local storage
-      document.cookie = "accessToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-      document.cookie = "refreshToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-      localStorage.removeItem('accessToken');
-
-      router.push('/login');
-    } catch (error) {
-      console.error("Logout failed:", error);
-      router.push('/login');
-    } finally {
-      setIsLoggingOut(false);
-    }
+  const handleLogout = () => {
+    startTransition(async () => {
+      await logout();
+      // Hard redirect so middleware clears protected page state
+      window.location.href = '/login';
+    });
   };
 
   return (
@@ -104,7 +50,7 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
         <div className={`flex flex-col h-full ${isCollapsed ? 'p-4 items-center' : 'p-6'}`}>
           <Link href="/dashboard" className={`flex items-center gap-3 mb-10 ${isCollapsed ? 'justify-center' : ''}`}>
             <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-white flex-shrink-0">
-               <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="currentColor" /></svg>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="currentColor" /></svg>
             </div>
             {!isCollapsed && (
               <div className="overflow-hidden whitespace-nowrap animate-in fade-in duration-300">
@@ -122,8 +68,8 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
                   key={item.name}
                   href={item.href}
                   className={`flex items-center rounded-2xl transition-all duration-200 group ${isActive
-                      ? 'bg-[#F3E8FF] text-primary font-semibold'
-                      : 'text-text-secondary hover:bg-text-secondary/5'
+                    ? 'bg-[#F3E8FF] text-primary font-semibold'
+                    : 'text-text-secondary hover:bg-text-secondary/5'
                     } ${isCollapsed ? 'justify-center p-3 w-14 h-14 mx-auto' : 'gap-4 px-4 py-3'}`}
                 >
                   <item.icon size={22} className={isActive ? 'text-primary' : 'text-text-secondary group-hover:text-text-primary'} />
@@ -137,29 +83,29 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
           <div className={`flex w-full pt-6 border-t border-text-secondary/10 mt-auto ${isCollapsed ? 'justify-center flex-col gap-4 items-center' : 'items-center justify-between'}`}>
             <Link href="/settings" className={`flex items-center gap-3 hover:opacity-80 transition-opacity ${isCollapsed ? 'justify-center' : ''}`}>
               {user ? (
-                <div className="w-10 h-10 rounded-full overflow-hidden border border-text-secondary/10">
-                    <img 
-                        src={user.avatarUrl || `https://ui-avatars.com/api/?name=${user.firstName}&background=833cf6&color=fff`} 
-                        alt="User" 
-                        className="w-full h-full object-cover" 
-                    />
+                <div className="w-10 h-10 rounded-full overflow-hidden border border-text-secondary/10 flex-shrink-0">
+                  <img
+                    src={user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent((user.firstName as string) || 'U')}&background=833cf6&color=fff`}
+                    alt="User"
+                    className="w-full h-full object-cover"
+                  />
                 </div>
               ) : (
-                <div className="w-10 h-10 bg-gray-200 rounded-full animate-pulse"></div>
+                <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse flex-shrink-0" />
               )}
               {!isCollapsed && user && (
                 <div className="overflow-hidden whitespace-nowrap animate-in fade-in">
-                  <h4 className="text-sm font-bold text-text-primary truncate">{user.firstName} {user.lastName}</h4>
-                  <p className="text-[11px] text-text-secondary truncate">{user.email}</p>
+                  <h4 className="text-sm font-bold text-text-primary truncate">{user.firstName as string} {user.lastName as string}</h4>
+                  <p className="text-[11px] text-text-secondary truncate">{user.email as string}</p>
                 </div>
               )}
             </Link>
             <button
               onClick={handleLogout}
-              disabled={isLoggingOut}
+              disabled={isPending}
               className={`text-text-secondary hover:text-red-500 transition-colors ${isCollapsed ? 'bg-background rounded-xl w-10 h-10 flex items-center justify-center border border-text-secondary/10' : 'p-2'}`}
             >
-              {isLoggingOut ? <Loader2 size={20} className="animate-spin" /> : <LogOut size={20} />}
+              {isPending ? <Loader2 size={20} className="animate-spin" /> : <LogOut size={20} />}
             </button>
           </div>
         </div>

@@ -1,141 +1,79 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useTransition } from "react";
 import { Camera, Check, Loader2, Edit3, AlertCircle } from "lucide-react";
 import { useUser } from "@/hooks/useUser";
 
-// Define your backend base URL
-const BASE_URL = "http://135.181.242.234:7860";
-
 export default function ProfileSettingsPage() {
-  const { user, updateUser } = useUser();
+  const { user, isLoading, updateUser, uploadUserAvatar } = useUser();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const [isSaving, startSaveTransition] = useTransition();
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [profileForm, setProfileForm] = useState({
-    firstName: "", lastName: "", email: "", avatar: ""
+    firstName: "",
+    lastName: "",
+    email: "",
+    avatarUrl: "",
   });
 
-  // --- HELPER: GET TOKEN FROM COOKIE ---
-  const getAuthToken = () => {
-    const name = "accessToken=";
-    const decodedCookie = decodeURIComponent(document.cookie);
-    const ca = decodedCookie.split(';');
-    for (let i = 0; i < ca.length; i++) {
-      let c = ca[i].trim();
-      if (c.indexOf(name) === 0) return c.substring(name.length, c.length);
-    }
-    return "";
-  };
-
-  // 1. FETCH ACTUAL USER DATA ON LOAD (GET /auth/me)
+  // Sync form when user data arrives from hook
   useEffect(() => {
-    const fetchUserData = async () => {
-      const token = getAuthToken();
-      if (!token) return;
-
-      try {
-        const res = await fetch(`${BASE_URL}/auth/me`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json'
-          }
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          // Map backend fields to your form
-          const userData = {
-            firstName: data.firstName || "",
-            lastName: data.lastName || "",
-            email: data.email || "",
-            avatar: data.avatarUrl || "" 
-          };
-          setProfileForm(userData);
-          updateUser(data); // Sync global hook
-        }
-      } catch (err) {
-        console.error("Failed to load user data", err);
-      }
-    };
-
-    fetchUserData();
-  }, [updateUser]);
-
-  // 2. SAVE PROFILE CHANGES (POST /auth/profile)
-  const handleSaveProfile = async () => {
-    setIsSaving(true);
-    setError(null);
-    const token = getAuthToken();
-
-    try {
-      const res = await fetch(`${BASE_URL}/auth/profile`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
-        },
-        body: JSON.stringify({ 
-          firstName: profileForm.firstName, 
-          lastName: profileForm.lastName, 
-          timezone: "Asia/Karachi" 
-        })
+    if (user) {
+      setProfileForm({
+        firstName: (user.firstName as string) || "",
+        lastName: (user.lastName as string) || "",
+        email: (user.email as string) || "",
+        avatarUrl: (user.avatarUrl as string) || "",
       });
+    }
+  }, [user]);
 
-      if (res.ok) {
-        updateUser({ ...user, ...profileForm });
+  const handleSaveProfile = () => {
+    setError(null);
+    startSaveTransition(async () => {
+      const result = await updateUser({
+        firstName: profileForm.firstName,
+        lastName: profileForm.lastName,
+        timezone: "Asia/Karachi",
+      });
+      if (result.success) {
         setIsEditing(false);
         setShowSuccessModal(true);
       } else {
-        const data = await res.json();
-        setError(data.message || "Failed to update profile");
+        setError(result.error ?? "Failed to update profile");
       }
-    } catch (err) {
-      setError("Connection error");
-    } finally {
-      setIsSaving(false);
-    }
+    });
   };
 
-  // 3. UPLOAD AVATAR (POST /auth/avatar)
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setError(null);
 
-    const token = getAuthToken();
     const formData = new FormData();
-    formData.append('file', file); // 'file' matches your Swagger requirement
+    formData.append("file", file);
 
-    setIsSaving(true);
-    try {
-      const res = await fetch(`${BASE_URL}/auth/avatar`, { 
-        method: 'POST', 
-        headers: { 'Authorization': `Bearer ${token}` },
-        body: formData 
-      });
-      
-      const data = await res.json();
-      if (res.ok && data.avatarUrl) {
-        setProfileForm(prev => ({ ...prev, avatar: data.avatarUrl }));
-        updateUser({ ...user, avatar: data.avatarUrl });
+    startSaveTransition(async () => {
+      const result = await uploadUserAvatar(formData);
+      if (result.success && result.avatarUrl) {
+        setProfileForm((prev) => ({ ...prev, avatarUrl: result.avatarUrl as string }));
         setShowSuccessModal(true);
+      } else {
+        setError(result.error ?? "Avatar upload failed");
       }
-    } catch (err) {
-      setError("Avatar upload failed");
-    } finally {
-      setIsSaving(false);
-    }
+    });
   };
 
-  if (!user) return (
-    <div className="h-64 flex items-center justify-center">
-      <Loader2 className="animate-spin text-primary" size={36} />
-    </div>
-  );
+  if (isLoading) {
+    return (
+      <div className="h-64 flex items-center justify-center">
+        <Loader2 className="animate-spin text-primary" size={36} />
+      </div>
+    );
+  }
 
   return (
     <>
@@ -155,11 +93,10 @@ export default function ProfileSettingsPage() {
       )}
 
       <div className="bg-bg-primary rounded-[40px] border border-text-secondary/10 p-10 shadow-sm animate-in fade-in duration-500">
-        
         {error && (
-            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 text-red-500 rounded-2xl text-sm font-bold flex items-center gap-2">
-                <AlertCircle size={18} /> {error}
-            </div>
+          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 text-red-500 rounded-2xl text-sm font-bold flex items-center gap-2">
+            <AlertCircle size={18} /> {error}
+          </div>
         )}
 
         <div className="flex justify-between items-start mb-12">
@@ -167,8 +104,9 @@ export default function ProfileSettingsPage() {
             <div className="relative group">
               <div className="w-28 h-28 rounded-[32px] overflow-hidden border-2 border-text-secondary/10 bg-secondary shadow-inner">
                 <img
-                  src={profileForm.avatar || `https://ui-avatars.com/api/?name=${profileForm.firstName}&background=833cf6&color=fff`}
-                  alt="Profile" className="w-full h-full object-cover"
+                  src={profileForm.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(profileForm.firstName || "U")}&background=833cf6&color=fff`}
+                  alt="Profile"
+                  className="w-full h-full object-cover"
                 />
               </div>
               <button
@@ -200,8 +138,8 @@ export default function ProfileSettingsPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-          <SettingInput label="First Name" value={profileForm.firstName} disabled={!isEditing} onChange={(e: any) => setProfileForm({ ...profileForm, firstName: e.target.value })} />
-          <SettingInput label="Last Name" value={profileForm.lastName} disabled={!isEditing} onChange={(e: any) => setProfileForm({ ...profileForm, lastName: e.target.value })} />
+          <SettingInput label="First Name" value={profileForm.firstName} disabled={!isEditing} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProfileForm({ ...profileForm, firstName: e.target.value })} />
+          <SettingInput label="Last Name" value={profileForm.lastName} disabled={!isEditing} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProfileForm({ ...profileForm, lastName: e.target.value })} />
           <div className="md:col-span-2 opacity-60">
             <SettingInput label="Email Address (read-only)" type="email" value={profileForm.email} disabled={true} />
           </div>
@@ -211,7 +149,7 @@ export default function ProfileSettingsPage() {
   );
 }
 
-function SettingInput({ label, ...props }: any) {
+function SettingInput({ label, ...props }: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <div className="w-full">
       <label className="block text-[10px] font-black text-text-secondary mb-2.5 uppercase tracking-[0.2em]">{label}</label>

@@ -1,11 +1,13 @@
 "use client";
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useTransition } from 'react';
 import { Mail, ArrowLeft, KeyRound, ShieldCheck, Lock, Eye, EyeOff } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { forgotPassword, verifyResetOtp, resetPassword } from '@/lib/auth';
 
 export default function ForgotPassword() {
   const router = useRouter();
   const [step, setStep] = useState<'email' | 'otp' | 'password'>('email');
+  const [isPending, startTransition] = useTransition();
 
   // Data States
   const [email, setEmail] = useState('');
@@ -16,99 +18,56 @@ export default function ForgotPassword() {
 
   // UI States
   const [showPass, setShowPass] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // BASE URL - Removed trailing slash to prevent 404s
-  const BASE_URL = "http://135.181.242.234:7860";
-
-  // --- SAFE FETCH WRAPPER ---
-  // This function prevents the "Unexpected Token <" crash
-  const safeFetch = async (endpoint: string, body: object) => {
-    const response = await fetch(`${BASE_URL}${endpoint}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-      },
-      body: JSON.stringify(body),
-    });
-
-    const contentType = response.headers.get("content-type");
-
-    if (contentType && contentType.includes("application/json")) {
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || "Request failed");
-      return data;
-    } else {
-      // If server sends HTML, we capture it to see the error
-      const htmlError = await response.text();
-      console.error("SERVER ERROR HTML:", htmlError);
-      throw new Error(`Server returned HTML (Error ${response.status}). Check console.`);
-    }
-  };
-
-  // ---------------- STEP 1: FORGOT PASSWORD ----------------
-  const handleSendReset = async (e: React.FormEvent) => {
+  // STEP 1
+  const handleSendReset = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setError(null);
-    try {
-      await safeFetch("/auth/forgot-password", { email });
+    startTransition(async () => {
+      const result = await forgotPassword(email);
+      if (!result.success) {
+        setError(result.error ?? 'Failed to send reset email');
+        return;
+      }
       setStep('otp');
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
-    }
+    });
   };
 
-  // ---------------- STEP 2: VERIFY OTP ----------------
-  const handleVerifyOtp = async (e: React.FormEvent) => {
+  // STEP 2
+  const handleVerifyOtp = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setError(null);
-    try {
-      const data = await safeFetch("/auth/verify-reset-otp", {
-        email,
-        otp: otp.join("")
-      });
-      // Capture the token returned by your backend
-      setResetToken(data.resetToken || data.token);
+    startTransition(async () => {
+      const result = await verifyResetOtp(email, otp.join(''));
+      if (!result.success || !result.resetToken) {
+        setError(result.error ?? 'OTP verification failed');
+        return;
+      }
+      setResetToken(result.resetToken);
       setStep('password');
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
-    }
+    });
   };
 
-  // ---------------- STEP 3: RESET PASSWORD ----------------
-  const handleFinalReset = async (e: React.FormEvent) => {
+  // STEP 3
+  const handleFinalReset = (e: React.FormEvent) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
-      setError("Passwords do not match");
+      setError('Passwords do not match');
       return;
     }
-    setIsLoading(true);
     setError(null);
-    try {
-      await safeFetch("/auth/reset-password", {
-        email,
-        resetToken,
-        newPassword,
-        confirmPassword
-      });
-      router.push("/login");
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
-    }
+    startTransition(async () => {
+      const result = await resetPassword({ email, resetToken, newPassword, confirmPassword });
+      if (!result.success) {
+        setError(result.error ?? 'Password reset failed');
+        return;
+      }
+      router.push('/login');
+    });
   };
 
-  // --- OTP Input Handler ---
   const handleOtpChange = (value: string, index: number) => {
     if (isNaN(Number(value))) return;
     const newOtp = [...otp];
@@ -145,9 +104,17 @@ export default function ForgotPassword() {
           <form onSubmit={handleSendReset} className="space-y-5">
             <div className="relative">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-txt-secondary w-5 h-5" />
-              <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full pl-12 pr-4 py-3.5 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary text-txt-primary" placeholder="Enter email" />
+              <input
+                type="email" required value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+                className="w-full pl-12 pr-4 py-3.5 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary text-txt-primary"
+                placeholder="Enter email"
+              />
             </div>
-            <button type="submit" disabled={isLoading} className="w-full bg-primary text-white font-bold py-4 rounded-2xl hover:opacity-90">{isLoading ? "Sending..." : "Continue"}</button>
+            <button type="submit" disabled={isPending} className="w-full bg-primary text-white font-bold py-4 rounded-2xl hover:opacity-90">
+              {isPending ? "Sending..." : "Continue"}
+            </button>
           </form>
         )}
 
@@ -155,25 +122,55 @@ export default function ForgotPassword() {
           <form onSubmit={handleVerifyOtp} className="space-y-6">
             <div className="flex justify-between gap-2">
               {otp.map((digit, idx) => (
-                <input key={idx} ref={(el) => { inputRefs.current[idx] = el; }} type="text" maxLength={1} value={digit} onChange={(e) => handleOtpChange(e.target.value, idx)} className="w-full h-14 text-center text-xl font-bold bg-background border border-bg-primary rounded-xl text-txt-primary focus:ring-2 focus:ring-primary outline-none" />
+                <input
+                  key={idx}
+                  ref={(el) => { inputRefs.current[idx] = el; }}
+                  type="text" maxLength={1} value={digit}
+                  onChange={(e) => handleOtpChange(e.target.value, idx)}
+                  className="w-full h-14 text-center text-xl font-bold bg-background border border-bg-primary rounded-xl text-txt-primary focus:ring-2 focus:ring-primary outline-none"
+                />
               ))}
             </div>
-            <button type="submit" disabled={isLoading} className="w-full bg-primary text-white font-bold py-4 rounded-2xl">{isLoading ? "Verifying..." : "Verify Code"}</button>
+            <button type="submit" disabled={isPending} className="w-full bg-primary text-white font-bold py-4 rounded-2xl">
+              {isPending ? "Verifying..." : "Verify Code"}
+            </button>
           </form>
         )}
 
         {step === 'password' && (
           <form onSubmit={handleFinalReset} className="space-y-4">
             <div className="relative">
-              <input type={showPass ? "text" : "password"} placeholder="New Password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full px-4 pr-12 py-3.5 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary text-txt-primary" />
-              <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-4 top-1/2 -translate-y-1/2 text-txt-secondary">{showPass ? <EyeOff size={18} /> : <Eye size={18} />}</button>
+              <input
+                type={showPass ? "text" : "password"}
+                placeholder="New Password (min 8 chars)"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                autoComplete="new-password"
+                className="w-full px-4 pr-12 py-3.5 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary text-txt-primary"
+                required
+              />
+              <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-4 top-1/2 -translate-y-1/2 text-txt-secondary">
+                {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
-            <input type="password" placeholder="Confirm Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full px-4 py-3.5 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary text-txt-primary" />
-            <button type="submit" disabled={isLoading} className="w-full bg-primary text-white font-bold py-4 rounded-2xl">Reset Password</button>
+            <input
+              type="password" placeholder="Confirm Password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              autoComplete="new-password"
+              className="w-full px-4 py-3.5 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary text-txt-primary"
+              required
+            />
+            <button type="submit" disabled={isPending} className="w-full bg-primary text-white font-bold py-4 rounded-2xl">
+              {isPending ? "Resetting..." : "Reset Password"}
+            </button>
           </form>
         )}
 
-        <button onClick={() => step === 'email' ? router.push("/login") : setStep('email')} className="mt-8 w-full flex items-center justify-center gap-2 text-xs text-txt-secondary font-bold hover:text-primary transition-colors">
+        <button
+          onClick={() => step === 'email' ? router.push("/login") : setStep('email')}
+          className="mt-8 w-full flex items-center justify-center gap-2 text-xs text-txt-secondary font-bold hover:text-primary transition-colors"
+        >
           <ArrowLeft size={14} /> Back to Login
         </button>
       </div>

@@ -1,50 +1,111 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from 'react';
-import { authApi } from '@/lib/api/Auth';
+import { useState, useEffect, useCallback, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { login as loginAction, logout as logoutAction } from '@/lib/auth';
 
-export const useAuth = () => {
-  const [user, setUser] = useState<any>(null);
+export interface AuthUser {
+  id?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  avatarUrl?: string;
+  [key: string]: unknown;
+}
+
+export interface AuthState {
+  user: AuthUser | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+  error: string | null;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  clearError: () => void;
+}
+
+export const useAuth = (): AuthState => {
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [, startTransition] = useTransition();
   const router = useRouter();
 
-  // Restore session on page load via HttpOnly cookie
+  // Fetch current session on mount via a public API route
   useEffect(() => {
-    const initAuth = async () => {
+    const fetchSession = async () => {
       try {
-        const res = await authApi.getMe();
-        setUser(res.user || res);
+        const res = await fetch('/api/auth/session', { credentials: 'same-origin' });
+        if (res.ok) {
+          const data = await res.json();
+          setUser(data.user || null);
+        } else {
+          setUser(null);
+        }
       } catch {
         setUser(null);
+      } finally {
+        setIsLoading(false);
       }
     };
-    initAuth();
+    fetchSession();
   }, []);
 
-  const login = async (formData: any) => {
+  const login = useCallback(
+    async (email: string, password: string) => {
+      setIsLoading(true);
+      setError(null);
+      startTransition(async () => {
+        try {
+          const result = await loginAction(email, password);
+          if (!result.success) {
+            setError(result.error ?? 'Login failed');
+            setIsLoading(false);
+            return;
+          }
+          // Re-fetch session to populate user state
+          const res = await fetch('/api/auth/session', { credentials: 'same-origin' });
+          if (res.ok) {
+            const data = await res.json();
+            setUser(data.user || null);
+          }
+          router.push('/dashboard');
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : 'Login failed';
+          setError(message);
+        } finally {
+          setIsLoading(false);
+        }
+      });
+    },
+    [router, startTransition],
+  );
+
+  const logout = useCallback(async () => {
     setIsLoading(true);
-    setError(null);
-    try {
-      const res = await authApi.login(formData);
-      setUser(res.user || res);
-      router.push('/dashboard');
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    startTransition(async () => {
+      try {
+        await logoutAction();
+        setUser(null);
+        router.push('/login');
+      } catch {
+        // Force redirect even on error
+        setUser(null);
+        router.push('/login');
+      } finally {
+        setIsLoading(false);
+      }
+    });
+  }, [router, startTransition]);
 
-  const logout = async () => {
-    try {
-      await authApi.logout();
-    } finally {
-      setUser(null);
-      router.push('/login');
-    }
-  };
+  const clearError = useCallback(() => setError(null), []);
 
-  return { user, error, isLoading, login, logout };
+  return {
+    user,
+    isLoading,
+    isAuthenticated: !!user,
+    error,
+    login,
+    logout,
+    clearError,
+  };
 };

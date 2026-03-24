@@ -1,89 +1,62 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Instagram, Facebook, Linkedin, Globe, Zap, Lock, Loader2 } from 'lucide-react';
+import { Instagram, Facebook, Linkedin, Globe, Zap, Loader2 } from 'lucide-react';
 
-const getAuthToken = () => {
-    const name = "accessToken=";
-    const decodedCookie = decodeURIComponent(document.cookie);
-    const ca = decodedCookie.split(';');
-    for (let i = 0; i < ca.length; i++) {
-      let c = ca[i].trim();
-      if (c.indexOf(name) === 0) return c.substring(name.length, c.length);
-    }
-    return "";
-  };
-
-// Configuration for API Endpoints based on your images
 const PLATFORMS = [
-  { id: 'ig', name: "Instagram", icon: <Instagram size={24} />, apiName: 'instagram' },
-  { id: 'gb', name: "Google Business", icon: <Globe size={24} />, apiName: 'google' },
-  { id: 'fb', name: "Facebook", icon: <Facebook size={24} />, apiName: 'facebook' },
-  { id: 'li', name: "Linkedin", icon: <Linkedin size={24} />, apiName: 'linkedin' },
+  { id: 'ig', name: 'Instagram', icon: <Instagram size={24} />, apiName: 'instagram' },
+  { id: 'gb', name: 'Google Business', icon: <Globe size={24} />, apiName: 'google' },
+  { id: 'fb', name: 'Facebook', icon: <Facebook size={24} />, apiName: 'facebook' },
+  { id: 'li', name: 'Linkedin', icon: <Linkedin size={24} />, apiName: 'linkedin' },
 ];
 
-const BASE_URL = 'https://wenona-polydisperse-aracely.ngrok-free.dev/social-connections';
-const AUTH_TOKEN = getAuthToken(); // Replace with your actual token
+// All requests go through /api/social — token and backend URL are server-side only
+const socialFetch = (platform: string, action: string, method = 'GET') =>
+  fetch(`/api/social/${platform}/${action}`, { method }).then((r) => r.json());
 
 export default function SocialConnections() {
   const [activeId, setActiveId] = useState('li');
   const [loading, setLoading] = useState<{ [key: string]: boolean }>({});
-  const [statusData, setStatusData] = useState<{ [key: string]: any }>({});
+  const [statusData, setStatusData] = useState<{ [key: string]: Record<string, unknown> }>({});
 
-  // 1. Fetch Status for the selected card
   const fetchStatus = async (apiName: string, id: string) => {
     try {
-      const res = await fetch(`${BASE_URL}/${apiName}/status`, {
-        headers: { 'Authorization': `Bearer ${AUTH_TOKEN}`, 'accept': 'application/json' }
-      });
-      const data = await res.json();
-      setStatusData(prev => ({ ...prev, [id]: data }));
-    } catch (err) {
-      console.error("Failed to fetch status", err);
+      const data = await socialFetch(apiName, 'status');
+      setStatusData((prev) => ({ ...prev, [id]: data }));
+    } catch {
+      // Silently ignore — status will just show as disconnected
     }
   };
 
-  // 2. Handle Connect (GET /connect)
   const handleConnect = async (apiName: string, id: string) => {
-    setLoading(prev => ({ ...prev, [id]: true }));
+    setLoading((prev) => ({ ...prev, [id]: true }));
     try {
-      const res = await fetch(`${BASE_URL}/${apiName}/connect`, {
-        headers: { 'Authorization': `Bearer ${AUTH_TOKEN}`, 'accept': 'application/json' }
-      });
-      const data = await res.json();
-      
-      // If the API returns an OAuth URL, redirect the user
+      const data = await socialFetch(apiName, 'connect');
       if (data.url) {
         window.location.href = data.url;
       } else {
         fetchStatus(apiName, id);
       }
-    } catch (err) {
-      alert("Connection failed. Check console.");
+    } catch {
+      // handled silently
     } finally {
-      setLoading(prev => ({ ...prev, [id]: false }));
+      setLoading((prev) => ({ ...prev, [id]: false }));
     }
   };
 
-  // 3. Handle Disconnect (DELETE /disconnect)
   const handleDisconnect = async (apiName: string, id: string) => {
-    if (!confirm("Disconnect this account?")) return;
-    
-    setLoading(prev => ({ ...prev, [id]: true }));
+    if (!confirm('Disconnect this account?')) return;
+    setLoading((prev) => ({ ...prev, [id]: true }));
     try {
-      await fetch(`${BASE_URL}/${apiName}/disconnect`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${AUTH_TOKEN}`, 'accept': 'application/json' }
-      });
+      await socialFetch(apiName, 'disconnect', 'DELETE');
       fetchStatus(apiName, id);
     } finally {
-      setLoading(prev => ({ ...prev, [id]: false }));
+      setLoading((prev) => ({ ...prev, [id]: false }));
     }
   };
 
   useEffect(() => {
-    // Initial status check for the default active card
-    const activePlatform = PLATFORMS.find(p => p.id === activeId);
+    const activePlatform = PLATFORMS.find((p) => p.id === activeId);
     if (activePlatform) fetchStatus(activePlatform.apiName, activeId);
   }, [activeId]);
 
@@ -98,7 +71,7 @@ export default function SocialConnections() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {PLATFORMS.map((item) => {
             const isActive = activeId === item.id;
-            const isConnected = statusData[item.id]?.connected === true; // Assuming API response structure
+            const isConnected = statusData[item.id]?.connected === true;
 
             return (
               <div

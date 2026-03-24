@@ -1,29 +1,64 @@
-const BASE_URL = 'http://135.181.242.234:7860';
+/**
+ * Server-only HTTP client.
+ * This file is used exclusively in server actions (lib/auth.ts, lib/user.ts).
+ * The API_URL env var has no NEXT_PUBLIC_ prefix — it is NEVER sent to the browser.
+ */
+
+const BASE_URL = process.env.API_URL || '';
+
+if (!BASE_URL && typeof window === 'undefined') {
+  console.warn('[http.ts] API_URL env var is not set. Requests will fail.');
+}
+
+interface RequestOptions extends RequestInit {
+  token?: string;
+}
 
 export const http = {
-  async request(endpoint: string, options: RequestInit = {}) {
+  async request(endpoint: string, options: RequestOptions = {}) {
+    const { token, ...fetchOptions } = options;
     const url = `${BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      ...(fetchOptions.body && !(fetchOptions.body instanceof FormData)
+        ? { 'Content-Type': 'application/json' }
+        : {}),
+      ...(options.headers as Record<string, string>),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+
     const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-      credentials: 'include', // Vital for HttpOnly Cookies
+      ...fetchOptions,
+      headers,
     });
 
-    const data = await response.json().catch(() => ({}));
+    // Handle non-JSON responses gracefully
+    const contentType = response.headers.get('content-type');
+    const data = contentType?.includes('application/json')
+      ? await response.json().catch(() => ({}))
+      : {};
 
     if (!response.ok) {
-      // Passes the backend error message (e.g., "Invalid Password") to the UI
-      throw new Error(data.message || 'API Error');
+      throw new Error(data.message || `Request failed with status ${response.status}`);
     }
 
     return data;
   },
 
-  get: (url: string) => http.request(url, { method: 'GET' }),
-  post: (url: string, body: any) => http.request(url, { method: 'POST', body: JSON.stringify(body) }),
+  get: (url: string, token?: string) =>
+    http.request(url, { method: 'GET', token }),
+
+  post: (url: string, body: unknown, token?: string) =>
+    http.request(url, {
+      method: 'POST',
+      body: JSON.stringify(body),
+      token,
+    }),
+
+  postForm: (url: string, formData: FormData, token?: string) =>
+    http.request(url, { method: 'POST', body: formData, token }),
+
+  delete: (url: string, token?: string) =>
+    http.request(url, { method: 'DELETE', token }),
 };

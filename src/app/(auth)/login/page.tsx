@@ -1,60 +1,43 @@
 "use client";
 
-import React, { useState, FormEvent } from "react";
+import React, { useState, useTransition, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { FcGoogle } from "react-icons/fc";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { login } from "@/lib/auth";
 
-const BASE_URL = "http://135.181.242.234:7860";
+const GOOGLE_AUTH_URL = "/api/auth/google"; // proxied — never expose backend URL to client
 
 const LoginPage = () => {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
-  // ✅ GOOGLE LOGIN: Redirects to backend to start OAuth
   const handleGoogleLogin = () => {
-    window.location.href = `${BASE_URL}/auth/google`;
+    // Redirect through a server-side proxy — backend URL never exposed
+    window.location.href = GOOGLE_AUTH_URL;
   };
 
-  const handleLogin = async (e: FormEvent) => {
+  const handleLogin = (e: FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError(null);
 
-    try {
-      const response = await fetch(`${BASE_URL}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Accept": "application/json" },
-        body: JSON.stringify({
-          email,
-          password,
-          deviceId: "web-chrome-device-001"
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        // ✅ STORE FOR LATER USE (7 Days Persistence)
-        const cookieStr = "path=/; max-age=604800; samesite=lax";
-        document.cookie = `accessToken=${data.accessToken}; ${cookieStr}`;
-        document.cookie = `refreshToken=${data.refreshToken}; ${cookieStr}`;
-
-        localStorage.setItem("accessToken", data.accessToken);
-
+    startTransition(async () => {
+      try {
+        const result = await login(email, password);
+        if (!result.success) {
+          setError(result.error ?? "Login failed");
+          return;
+        }
         router.push("/dashboard");
-      } else {
-        setError(data.message || "Invalid login credentials");
+        router.refresh();
+      } catch {
+        setError("An unexpected error occurred. Please try again.");
       }
-    } catch (err) {
-      setError("Failed to connect to server.");
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   return (
@@ -88,19 +71,24 @@ const LoginPage = () => {
 
         <form className="space-y-5" onSubmit={handleLogin}>
           <input
-            type="email" required value={email}
+            type="email"
+            required
+            value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="w-full px-5 py-4 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary text-txt-primary"
             placeholder="name@company.com"
+            autoComplete="email"
           />
 
           <div className="relative">
             <input
               type={showPassword ? "text" : "password"}
-              required value={password}
+              required
+              value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-5 py-4 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary text-txt-primary"
               placeholder="••••••••"
+              autoComplete="current-password"
             />
             <button
               type="button"
@@ -111,14 +99,27 @@ const LoginPage = () => {
             </button>
           </div>
 
+          <div className="text-right">
+            <a href="/forgot-password" className="text-sm text-primary hover:underline font-semibold">
+              Forgot password?
+            </a>
+          </div>
+
           <button
             type="submit"
-            disabled={loading}
+            disabled={isPending}
             className="w-full py-4 bg-primary text-white rounded-2xl font-bold text-lg hover:opacity-90 transition-all flex items-center justify-center"
           >
-            {loading ? <Loader2 className="animate-spin" /> : "Log In"}
+            {isPending ? <Loader2 className="animate-spin" /> : "Log In"}
           </button>
         </form>
+
+        <p className="mt-6 text-center text-sm text-txt-secondary">
+          Don&apos;t have an account?{" "}
+          <a href="/register" className="text-primary font-bold hover:underline">
+            Sign up
+          </a>
+        </p>
       </div>
     </section>
   );
