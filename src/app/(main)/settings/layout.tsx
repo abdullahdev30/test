@@ -31,11 +31,10 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all ${
-                    isActive
+                  className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all ${isActive
                       ? 'bg-primary text-white shadow-lg shadow-primary/30'
                       : 'text-text-secondary hover:bg-text-primary/5 hover:text-text-primary'
-                  }`}
+                    }`}
                 >
                   <item.icon size={18} strokeWidth={isActive ? 2 : 1.5} />
                   {item.label}
