@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { login as loginAction, logout as logoutAction } from '@/lib/auth';
+import { login as loginAction, logout as logoutAction } from '@/lib/api/auth';
 
 export interface AuthUser {
   id?: string;

@@ -4,7 +4,7 @@ import React, { useState, useTransition, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { FcGoogle } from "react-icons/fc";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
-import { login } from "@/lib/auth";
+import { login } from "@/lib/api/auth";
 
 const GOOGLE_AUTH_URL = "/api/auth/google"; // proxied — never expose backend URL to client
 

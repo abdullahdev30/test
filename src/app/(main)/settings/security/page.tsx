@@ -6,8 +6,8 @@ import {
   Lock, Loader2, Eye, EyeOff, ShieldCheck
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { changePassword, setPassword } from "@/lib/auth";
-import { getSessions, revokeSession, logoutAll } from "@/lib/user";
+import { changePassword, setPassword } from "@/lib/api/auth";
+import { getSessions, revokeSession, logoutAll } from "@/lib/api/user";
 
 export default function SecuritySettingsPage() {
   const router = useRouter();

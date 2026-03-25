@@ -7,7 +7,7 @@ import {
   Settings, LogOut, ChevronLeft, ChevronRight, Loader2, Link2
 } from 'lucide-react';
 import { useUser } from '@/hooks/useUser';
-import { logout } from '@/lib/auth';
+import { logout } from '@/lib/api/auth';
 
 const menuItems = [
   { name: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
@@ -32,17 +32,17 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background">
+    <div className="flex h-screen w-full overflow-hidden bg-bg-primary">
       <aside
-        className={`h-screen flex flex-col flex-shrink-0 transition-all duration-300 relative ${isCollapsed ? 'w-[88px]' : 'w-[288px]'}`}
+        className={`h-screen flex flex-col bg-bg-primary flex-shrink-0 transition-all duration-300 relative ${isCollapsed ? 'w-[88px]' : 'w-[288px]'}`}
         style={{
-          backgroundColor: 'var(--secondary)',
+        
           borderRight: '1px solid rgba(0,0,0,0.1)'
         }}
       >
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="absolute -right-3 top-8 w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center shadow-md hover:scale-110 transition-transform z-10"
+          className="absolute right-0 top-8 w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center shadow-md hover:scale-110 transition-transform z-10"
         >
           {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
         </button>

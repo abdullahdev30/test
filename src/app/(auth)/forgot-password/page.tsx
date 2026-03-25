@@ -2,7 +2,7 @@
 import React, { useState, useRef, useTransition } from 'react';
 import { Mail, ArrowLeft, KeyRound, ShieldCheck, Lock, Eye, EyeOff } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { forgotPassword, verifyResetOtp, resetPassword } from '@/lib/auth';
+import { forgotPassword, verifyResetOtp, resetPassword } from '@/lib/api/auth';
 
 export default function ForgotPassword() {
   const router = useRouter();

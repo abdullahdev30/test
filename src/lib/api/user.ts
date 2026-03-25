@@ -1,7 +1,7 @@
 'use server';
 
 import { cookies } from 'next/headers';
-import { http } from './http';
+import { http } from '../http';
 
 /** Read the access token from httpOnly cookies (server-side only) */
 async function getAccessToken(): Promise<string | undefined> {

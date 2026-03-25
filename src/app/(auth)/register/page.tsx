@@ -8,7 +8,7 @@ import {
   ShieldCheck, RefreshCw, ChevronLeft,
   Loader2, Eye, EyeOff
 } from 'lucide-react';
-import { signup, verifyEmail, resendVerification } from '@/lib/auth';
+import { signup, verifyEmail, resendVerification } from '@/lib/api/auth';
 
 const GOOGLE_AUTH_URL = "/api/auth/google";
 

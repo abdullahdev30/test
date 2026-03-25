@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { getUser, updateProfile, uploadAvatar } from '@/lib/user';
+import { getUser, updateProfile, uploadAvatar } from '@/lib/api/user';
 
 export interface UserProfile {
   id?: string;
