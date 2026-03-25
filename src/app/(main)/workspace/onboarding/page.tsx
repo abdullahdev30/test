@@ -17,7 +17,7 @@ function slugify(name: string): string {
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { createWorkspace, upsertBusinessProfile } = useWorkspace();
+  const { createWorkspace, upsertBusinessProfile, completeOnboarding } = useWorkspace();
   const [, startTransition] = useTransition();
 
   const [step, setStep] = useState(1);
@@ -82,7 +82,17 @@ export default function OnboardingPage() {
   // ── Step 3: Redirect to workspace ─────────────────────────────────────────
   const handleComplete = () => {
     if (!completeToggle) return;
-    router.push('/workspace');
+    setIsSubmitting(true);
+    setApiError(null);
+    startTransition(async () => {
+      const result = await completeOnboarding({ confirm: true });
+      setIsSubmitting(false);
+      if (!result.success) {
+        setApiError(result.error ?? 'Failed to complete onboarding');
+        return;
+      }
+      router.push('/workspace');
+    });
   };
 
   const handleNext = () => {

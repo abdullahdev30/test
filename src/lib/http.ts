@@ -76,6 +76,13 @@ export const http = {
       token,
     }),
 
+  put: (url: string, body: unknown, token?: string) =>
+    http.request(url, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+      token,
+    }),
+
   delete: (url: string, token?: string) =>
     http.request(url, { method: 'DELETE', token }),
 };

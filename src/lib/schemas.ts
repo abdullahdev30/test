@@ -100,8 +100,35 @@ export const BusinessProfileSchema = z.object({
   targetAudience: z.string().optional(),
   services: z.array(z.string()).optional(),
   goals: z.array(z.string()).optional(),
+  preferredPlatforms: z.array(z.string()).optional(),
+  postingFrequency: z.string().optional(),
+  approvalRequired: z.boolean().optional(),
+  onboardingCompleted: z.boolean().optional(),
+  onboardingCompletedAt: z.string().optional().or(z.null()),
+});
+
+export const UpdateBusinessProfileSchema = BusinessProfileSchema.partial().refine(
+  (data) => Object.values(data).some((value) => value !== undefined && value !== null && value !== ''),
+  { message: 'At least one field is required for update' },
+);
+
+export const KeywordSchema = z.object({
+  keyword: z.string().min(1, 'Keyword is required').max(120),
+  keywordType: z.string().min(1, 'Keyword type is required'),
+});
+
+export const ReplaceKeywordsSchema = z.object({
+  keywords: z.array(KeywordSchema),
+});
+
+export const CompleteOnboardingSchema = z.object({
+  confirm: z.boolean(),
 });
 
 export type CreateWorkspaceInput = z.infer<typeof CreateWorkspaceSchema>;
 export type UpdateWorkspaceInput = z.infer<typeof UpdateWorkspaceSchema>;
 export type BusinessProfileInput = z.infer<typeof BusinessProfileSchema>;
+export type UpdateBusinessProfileInput = z.infer<typeof UpdateBusinessProfileSchema>;
+export type KeywordInput = z.infer<typeof KeywordSchema>;
+export type ReplaceKeywordsInput = z.infer<typeof ReplaceKeywordsSchema>;
+export type CompleteOnboardingInput = z.infer<typeof CompleteOnboardingSchema>;

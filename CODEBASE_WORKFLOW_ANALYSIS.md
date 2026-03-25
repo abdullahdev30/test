@@ -10,6 +10,12 @@ Last updated: 2026-03-25
 - Standardized social refresh/callback auth cookies to `SameSite=lax` to preserve OAuth callback compatibility.
 - Updated middleware to treat `refresh_token` as a valid session cookie for protected route/API access checks.
 - Added automatic refresh-token retry on 401 for user/workspace/social server calls, so sessions persist until logout (or invalid refresh token).
+- Integrated full Workspace module endpoint coverage:
+  - `/workspace`, `/workspace/me`, `/workspace/me/business-profile` (GET/POST/PATCH)
+  - `/workspace/me/keywords` (GET/POST/PUT/DELETE) and `/workspace/me/keywords/{id}` (PATCH/DELETE)
+  - `/workspace/me/onboarding-status` (GET) and `/workspace/me/complete-onboarding` (POST)
+- Updated `/workspace` page flow: first-time users now see create-workspace UI; existing users load workspace and live keywords directly from backend.
+- Updated workspace settings pages to use real backend APIs instead of mock keyword/profile data.
 
 ## 1) Scope
 
@@ -344,3 +350,17 @@ flowchart TD
 ---
 
 This file is intended as a living reference. Update it whenever workflows, routes, cookies, or API contracts change.
+
+## Update - 2026-03-25 Business Profile Full Field Coverage
+- Expanded `/workspace/settings/profile` UI to include full API profile fields: `businessName`, `brandSlug`, `industry`, `category`, `subcategory`, `description`, `websiteUrl`, `country`, `city`, `timezone`, `defaultLanguage`, `brandTone`, `targetAudience`, `services`, `goals`, `preferredPlatforms`, `postingFrequency`, `approvalRequired`.
+- Added array parsing for `services`, `goals`, and `preferredPlatforms` from multiline/comma-separated user input.
+- Added read-only system field rendering for `id`, `workspaceId`, `onboardingCompleted`, `onboardingCompletedAt`, `createdAt`, and `updatedAt`.
+- Updated schema/contracts so workspace profile payload supports `preferredPlatforms`, `postingFrequency`, `approvalRequired`, `onboardingCompleted`, and `onboardingCompletedAt`.
+- Verified by TypeScript check: `npx tsc --noEmit` passed on 2026-03-25.
+ 
+## Update - 2026-03-25 Workspace Delete Action 
+- Added DELETE /workspace/me integration in workspace API via deleteMyWorkspace(). 
+- Exposed deleteWorkspace() in useWorkspace and clear local workspace/profile/keywords/onboarding state after successful deletion. 
+- Added a Danger Zone section at the end of workspace profile settings with a confirmation prompt and delete button. 
+- On success, UI redirects to /workspace so user sees first-time create workspace flow again. 
+- Verified by TypeScript check: npx tsc --noEmit passed on 2026-03-25.
