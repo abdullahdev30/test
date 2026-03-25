@@ -59,6 +59,13 @@ export const http = {
   postForm: (url: string, formData: FormData, token?: string) =>
     http.request(url, { method: 'POST', body: formData, token }),
 
+  patch: (url: string, body: unknown, token?: string) =>
+    http.request(url, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+      token,
+    }),
+
   delete: (url: string, token?: string) =>
     http.request(url, { method: 'DELETE', token }),
 };

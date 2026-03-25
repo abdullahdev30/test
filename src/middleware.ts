@@ -26,7 +26,8 @@ const SECURITY_HEADERS: Record<string, string> = {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: https: blob:",
-    "connect-src 'self'",
+    // Back-end origins — never use NEXT_PUBLIC_ here; these are server-side only
+    "connect-src 'self' http://135.181.242.234:7860",
     "frame-ancestors 'none'",
   ].join('; '),
 };
@@ -44,6 +45,14 @@ export function middleware(request: NextRequest) {
   // Read the httpOnly access_token cookie (set by server actions)
   const token = request.cookies.get('access_token')?.value;
   const isAuthenticated = !!token;
+
+  // ── Protect BFF API routes — return 401 JSON (not a redirect) ───────────
+  const PROTECTED_API_PREFIXES = ['/api/workspace', '/api/social'];
+  if (!isAuthenticated && PROTECTED_API_PREFIXES.some((p) => pathname.startsWith(p))) {
+    return applySecurityHeaders(
+      NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    );
+  }
 
   // Redirect authenticated users away from auth pages
   if (isAuthenticated && AUTH_ROUTES.some((r) => pathname === r)) {

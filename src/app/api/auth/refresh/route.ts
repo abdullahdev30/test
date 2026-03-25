@@ -4,11 +4,12 @@ import { cookies } from 'next/headers';
 const COOKIE_OPTS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
-  sameSite: 'strict' as const,
+  // 'lax' required for OAuth cross-site redirect compatibility
+  sameSite: 'lax' as const,
   path: '/',
 };
 
-const ACCESS_MAX_AGE = 60 * 15;           // 15 minutes
+const ACCESS_MAX_AGE = 60 * 60 * 24;           // 1 day
 const REFRESH_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
 // Simple in-memory rate limiter (per IP, max 5 requests/minute)

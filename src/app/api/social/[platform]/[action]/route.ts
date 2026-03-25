@@ -1,64 +1,180 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getValidToken } from '@/lib/api/socialAuth';
 import { cookies } from 'next/headers';
 
-const SOCIAL_API_URL = process.env.SOCIAL_API_URL || 'https://wenona-polydisperse-aracely.ngrok-free.dev/social-connections';
+// ─── Cookie config ────────────────────────────────────────────────────────────
+// path '/' — cookie must be readable by ALL routes, not just /connections
+const COOKIE_OPTS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax' as const, // 'lax' required so OAuth redirect back sets the cookie
+  path: '/',
+};
 
-/**
- * /api/social/[platform]/[action]
- * Proxies social connection requests to the external API,
- * reading the access_token from the httpOnly cookie server-side.
- * The external backend URL and token are NEVER sent to the client.
- */
+const PLATFORM_CONNECTIONS_COOKIE = 'platform_connections';
+const CONNECTIONS_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
+
+/** Read the cached platform_connections JSON cookie */
+async function getPlatformConnections(): Promise<Record<string, unknown>> {
+  const cookieStore = await cookies();
+  const raw = cookieStore.get(PLATFORM_CONNECTIONS_COOKIE)?.value;
+  try { return raw ? JSON.parse(raw) : {}; } catch { return {}; }
+}
+
+/** Persist updated platform_connections JSON cookie */
+async function setPlatformConnections(data: Record<string, unknown>) {
+  const cookieStore = await cookies();
+  cookieStore.set(PLATFORM_CONNECTIONS_COOKIE, JSON.stringify(data), {
+    ...COOKIE_OPTS,
+    maxAge: CONNECTIONS_MAX_AGE,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET — status check (called by useSocial polling)
+// ─────────────────────────────────────────────────────────────────────────────
 export async function GET(
-  _req: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ platform: string; action: string }> }
 ) {
   const { platform, action } = await params;
-  const cookieStore = await cookies();
-  const token = cookieStore.get('access_token')?.value;
+  const baseUrl = process.env.NEXT_PUBLIC_SOCIAL_BASE_URL;
 
+  // getValidToken() auto-refreshes if access_token cookie is missing
+  const token = await getValidToken();
   if (!token) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    const res = await fetch(`${SOCIAL_API_URL}/${platform}/${action}`, {
+    const response = await fetch(`${baseUrl}/social-connections/${platform}/${action}`, {
+      method: 'GET',
       headers: {
-        Authorization: `Bearer ${token}`,
         Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
       },
+      cache: 'no-store',
     });
 
-    const data = await res.json().catch(() => ({}));
-    return NextResponse.json(data, { status: res.status });
+    if (!response.ok) {
+      return NextResponse.json({ error: `Backend Error: ${response.status}` }, { status: response.status });
+    }
+
+    const data = await response.json();
+
+    // Sync username into the local cookie cache from live status
+    if (data?.status === 'connected') {
+      const conn = data?.connection;
+      const username = conn?.providerAccountName || conn?.providerAccountId || data?.username || null;
+
+      const connections = await getPlatformConnections();
+      connections[platform] = {
+        status: 'connected',
+        username,
+        providerAccountName: username,
+      };
+      await setPlatformConnections(connections);
+    }
+
+    return NextResponse.json(data);
   } catch {
-    return NextResponse.json({ error: 'Social API request failed' }, { status: 502 });
+    return NextResponse.json({ error: 'Connection to backend failed' }, { status: 502 });
   }
 }
 
-export async function DELETE(
-  _req: NextRequest,
+// ─────────────────────────────────────────────────────────────────────────────
+// POST — connect (get OAuth URL) or disconnect (clear tokens)
+// ─────────────────────────────────────────────────────────────────────────────
+export async function POST(
+  request: NextRequest,
   { params }: { params: Promise<{ platform: string; action: string }> }
 ) {
   const { platform, action } = await params;
-  const cookieStore = await cookies();
-  const token = cookieStore.get('access_token')?.value;
+  const baseUrl = process.env.NEXT_PUBLIC_SOCIAL_BASE_URL;
 
+  // Auto-refresh on missing access_token
+  const token = await getValidToken();
   if (!token) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // ── CONNECT: return fresh OAuth URL ──────────────────────────────────────
+  if (action === 'connect') {
+    try {
+      const res = await fetch(`${baseUrl}/social-connections/${platform}/connect`, {
+        method: 'GET',
+        headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+        cache: 'no-store',
+      });
+
+      if (!res.ok) {
+        return NextResponse.json({ error: `Backend error ${res.status}` }, { status: res.status });
+      }
+
+      const data = await res.json();
+      const authUrl = data.authUrl ?? data.url ?? data.redirectUrl;
+
+      if (!authUrl) {
+        return NextResponse.json({ error: 'No OAuth URL returned from backend' }, { status: 502 });
+      }
+
+      // Return the auth URL — client redirects window.location to it
+      return NextResponse.json({ authUrl });
+    } catch {
+      return NextResponse.json({ error: 'Failed to get OAuth URL' }, { status: 500 });
+    }
+  }
+
+  // ── DISCONNECT: call backend + clear local cookie entry ──────────────────
+  if (action === 'disconnect') {
+    try {
+      // Best-effort backend disconnect
+      await fetch(`${baseUrl}/social-connections/${platform}/disconnect`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+      }).catch(() => null);
+
+      // Remove platform from local cookie cache immediately
+      const connections = await getPlatformConnections();
+      delete connections[platform];
+      await setPlatformConnections(connections);
+
+      return NextResponse.json({ disconnected: true });
+    } catch {
+      return NextResponse.json({ error: 'Disconnect failed' }, { status: 500 });
+    }
+  }
+
+  return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DELETE — backward compatibility (same as POST disconnect)
+// ─────────────────────────────────────────────────────────────────────────────
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ platform: string; action: string }> }
+) {
+  const { platform } = await params;
+
+  const token = await getValidToken();
+  if (!token) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const baseUrl = process.env.NEXT_PUBLIC_SOCIAL_BASE_URL;
   try {
-    const res = await fetch(`${SOCIAL_API_URL}/${platform}/${action}`, {
+    await fetch(`${baseUrl}/social-connections/${platform}/disconnect`, {
       method: 'DELETE',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
-      },
-    });
-    const data = await res.json().catch(() => ({}));
-    return NextResponse.json(data, { status: res.status });
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+    }).catch(() => null);
+
+    const connections = await getPlatformConnections();
+    delete connections[platform];
+    await setPlatformConnections(connections);
+
+    return NextResponse.json({ disconnected: true });
   } catch {
-    return NextResponse.json({ error: 'Social API request failed' }, { status: 502 });
+    return NextResponse.json({ error: 'Failed to disconnect' }, { status: 500 });
   }
 }

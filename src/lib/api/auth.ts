@@ -15,7 +15,11 @@ import {
 const COOKIE_OPTS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
-  sameSite: 'strict' as const,
+  // 'lax' (not 'strict') is required for OAuth flows:
+  // When the OAuth provider redirects back to /api/social/[platform]/callback,
+  // browsers treat it as a cross-site top-level navigation and ONLY send
+  // cookies with SameSite=Lax or None. 'strict' blocks them entirely.
+  sameSite: 'lax' as const,
   path: '/',
 };
 

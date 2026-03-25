@@ -44,14 +44,14 @@ export default function SecuritySettingsPage() {
     startSaveTransition(async () => {
       const result = passwordMode === 'change'
         ? await changePassword({
-            currentPassword: passwordForm.current,
-            newPassword: passwordForm.new,
-            confirmPassword: passwordForm.confirm,
-          })
+          currentPassword: passwordForm.current,
+          newPassword: passwordForm.new,
+          confirmPassword: passwordForm.confirm,
+        })
         : await setPassword({
-            password: passwordForm.new,
-            confirmPassword: passwordForm.confirm,
-          });
+          password: passwordForm.new,
+          confirmPassword: passwordForm.confirm,
+        });
 
       if (result.success) {
         setPasswordMode(null);

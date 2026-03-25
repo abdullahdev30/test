@@ -71,3 +71,37 @@ export type VerifyEmailInput = z.infer<typeof VerifyEmailSchema>;
 export type ForgotPasswordInput = z.infer<typeof ForgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>;
 export type ChangePasswordInput = z.infer<typeof ChangePasswordSchema>;
+
+// ─── Workspace Schemas ───────────────────────────────────────────────────────
+
+export const CreateWorkspaceSchema = z.object({
+  name: z.string().min(1, 'Workspace name is required').max(100),
+  slug: z.string().min(1, 'Slug is required').max(100).regex(/^[a-z0-9-]+$/, 'Slug can only contain lowercase letters, numbers and hyphens'),
+});
+
+export const UpdateWorkspaceSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  slug: z.string().min(1).max(100).regex(/^[a-z0-9-]+$/).optional(),
+});
+
+export const BusinessProfileSchema = z.object({
+  businessName: z.string().min(1, 'Business name is required').max(150),
+  brandSlug: z.string().optional(),
+  industry: z.string().optional(),
+  category: z.string().optional(),
+  subcategory: z.string().optional(),
+  description: z.string().optional(),
+  websiteUrl: z.string().url('Invalid URL').optional().or(z.literal('')),
+  country: z.string().optional(),
+  city: z.string().optional(),
+  timezone: z.string().optional(),
+  defaultLanguage: z.string().optional(),
+  brandTone: z.string().optional(),
+  targetAudience: z.string().optional(),
+  services: z.array(z.string()).optional(),
+  goals: z.array(z.string()).optional(),
+});
+
+export type CreateWorkspaceInput = z.infer<typeof CreateWorkspaceSchema>;
+export type UpdateWorkspaceInput = z.infer<typeof UpdateWorkspaceSchema>;
+export type BusinessProfileInput = z.infer<typeof BusinessProfileSchema>;
