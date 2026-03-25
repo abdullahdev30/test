@@ -47,14 +47,23 @@ export async function GET(
   }
 
   try {
-    const response = await fetch(`${baseUrl}/social-connections/${platform}/${action}`, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      cache: 'no-store',
-    });
+    const callWithToken = (authToken: string) =>
+      fetch(`${baseUrl}/social-connections/${platform}/${action}`, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${authToken}`,
+        },
+        cache: 'no-store',
+      });
+
+    let response = await callWithToken(token);
+    if (response.status === 401) {
+      const refreshed = await getValidToken({ forceRefresh: true });
+      if (refreshed) {
+        response = await callWithToken(refreshed);
+      }
+    }
 
     if (!response.ok) {
       // For live status checks, treat non-2xx as disconnected and keep user on same page.
@@ -125,11 +134,20 @@ export async function POST(
   // ── CONNECT: return fresh OAuth URL ──────────────────────────────────────
   if (action === 'connect') {
     try {
-      const res = await fetch(`${baseUrl}/social-connections/${platform}/connect`, {
-        method: 'GET',
-        headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
-        cache: 'no-store',
-      });
+      const connectWithToken = (authToken: string) =>
+        fetch(`${baseUrl}/social-connections/${platform}/connect`, {
+          method: 'GET',
+          headers: { Accept: 'application/json', Authorization: `Bearer ${authToken}` },
+          cache: 'no-store',
+        });
+
+      let res = await connectWithToken(token);
+      if (res.status === 401) {
+        const refreshed = await getValidToken({ forceRefresh: true });
+        if (refreshed) {
+          res = await connectWithToken(refreshed);
+        }
+      }
 
       if (!res.ok) {
         return NextResponse.json({ error: `Backend error ${res.status}` }, { status: res.status });
@@ -152,11 +170,27 @@ export async function POST(
   // ── DISCONNECT: call backend + clear local cookie entry ──────────────────
   if (action === 'disconnect') {
     try {
-      // Best-effort backend disconnect
-      await fetch(`${baseUrl}/social-connections/${platform}/disconnect`, {
+      let authToken = token;
+      let res = await fetch(`${baseUrl}/social-connections/${platform}/disconnect`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-      }).catch(() => null);
+        headers: { Authorization: `Bearer ${authToken}`, Accept: 'application/json' },
+      });
+
+      if (res.status === 401) {
+        const refreshed = await getValidToken({ forceRefresh: true });
+        if (refreshed) {
+          authToken = refreshed;
+          res = await fetch(`${baseUrl}/social-connections/${platform}/disconnect`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${authToken}`, Accept: 'application/json' },
+          });
+        }
+      }
+
+      // Best-effort backend disconnect
+      if (!res.ok && res.status !== 401) {
+        await res.text().catch(() => null);
+      }
 
       // Remove platform from local cookie cache immediately
       const connections = await getPlatformConnections();
@@ -188,10 +222,20 @@ export async function DELETE(
 
   const baseUrl = process.env.NEXT_PUBLIC_SOCIAL_BASE_URL;
   try {
-    await fetch(`${baseUrl}/social-connections/${platform}/disconnect`, {
+    let res = await fetch(`${baseUrl}/social-connections/${platform}/disconnect`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-    }).catch(() => null);
+    });
+
+    if (res.status === 401) {
+      const refreshed = await getValidToken({ forceRefresh: true });
+      if (refreshed) {
+        res = await fetch(`${baseUrl}/social-connections/${platform}/disconnect`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${refreshed}`, Accept: 'application/json' },
+        });
+      }
+    }
 
     const connections = await getPlatformConnections();
     delete connections[platform];

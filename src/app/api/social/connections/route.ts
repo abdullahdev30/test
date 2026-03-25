@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
-const PLATFORMS = ['instagram', 'google', 'facebook', 'linkedin'] as const;
+const PLATFORMS = ['instagram', 'google-business-profile', 'facebook', 'linkedin'] as const;
 const PLATFORM_CONNECTIONS_COOKIE = 'platform_connections';
 
 // ─── Cookie config ────────────────────────────────────────────────────────────
@@ -77,7 +77,8 @@ export async function GET(request: NextRequest) {
   const result = PLATFORMS.reduce<
     Record<string, { connected: boolean; username: string | null; providerAccountName: string | null; status: string }>
   >((acc, p) => {
-    const entry = cached[p];
+    // Backward compatibility: old key "google" -> new key "google-business-profile"
+    const entry = p === 'google-business-profile' ? (cached[p] ?? cached.google) : cached[p];
     const name = entry?.providerAccountName ?? entry?.username ?? null;
     acc[p] = {
       connected: entry?.status === 'connected',

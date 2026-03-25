@@ -10,7 +10,7 @@ import { useSocial } from '@/hooks/useSocial';
 
 const PLATFORMS = [
   { id: 'ig', name: 'Instagram', icon: Instagram, color: 'from-purple-500 to-pink-500', apiName: 'instagram' },
-  { id: 'gb', name: 'Google Business', icon: Globe, color: 'from-blue-500 to-cyan-400', apiName: 'google' },
+  { id: 'gb', name: 'Google Business', icon: Globe, color: 'from-blue-500 to-cyan-400', apiName: 'google-business-profile' },
   { id: 'fb', name: 'Facebook', icon: Facebook, color: 'from-blue-600 to-blue-400', apiName: 'facebook' },
   { id: 'li', name: 'LinkedIn', icon: Linkedin, color: 'from-sky-600 to-sky-400', apiName: 'linkedin' },
 ];

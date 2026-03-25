@@ -14,6 +14,11 @@ interface RequestOptions extends RequestInit {
   token?: string;
 }
 
+export interface HttpError extends Error {
+  status?: number;
+  data?: unknown;
+}
+
 export const http = {
   async request(endpoint: string, options: RequestOptions = {}) {
     const { token, ...fetchOptions } = options;
@@ -40,7 +45,12 @@ export const http = {
       : {};
 
     if (!response.ok) {
-      throw new Error(data.message || `Request failed with status ${response.status}`);
+      const error = new Error(
+        (data as { message?: string })?.message || `Request failed with status ${response.status}`,
+      ) as HttpError;
+      error.status = response.status;
+      error.data = data;
+      throw error;
     }
 
     return data;

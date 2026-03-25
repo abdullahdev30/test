@@ -1,12 +1,16 @@
 'use server';
 
 import { cookies } from 'next/headers';
-import { http } from '../http';
+import { http, type HttpError } from '../http';
+import { getValidToken } from './socialAuth';
 
 /** Read the access token from httpOnly cookies (server-side only) */
 async function getAccessToken(): Promise<string | undefined> {
-  const cookieStore = await cookies();
-  return cookieStore.get('access_token')?.value;
+  return (await getValidToken()) ?? undefined;
+}
+
+function isUnauthorizedError(err: unknown): boolean {
+  return !!(err && typeof err === 'object' && (err as HttpError).status === 401);
 }
 
 // ─────────────────────────────────────────────
@@ -22,6 +26,17 @@ export async function getUser() {
     const data = await http.get('/auth/me', token);
     return { success: true, user: data };
   } catch (err: unknown) {
+    if (isUnauthorizedError(err)) {
+      const refreshed = await getValidToken({ forceRefresh: true });
+      if (refreshed) {
+        try {
+          const data = await http.get('/auth/me', refreshed);
+          return { success: true, user: data };
+        } catch {
+          // fall through to standard error handling
+        }
+      }
+    }
     const message = err instanceof Error ? err.message : 'Failed to fetch user';
     return { success: false, error: message, user: null };
   }
@@ -48,6 +63,25 @@ export async function updateProfile(data: {
     );
     return { success: true };
   } catch (err: unknown) {
+    if (isUnauthorizedError(err)) {
+      const refreshed = await getValidToken({ forceRefresh: true });
+      if (refreshed) {
+        try {
+          await http.post(
+            '/auth/profile',
+            {
+              firstName: data.firstName,
+              lastName: data.lastName,
+              timezone: data.timezone ?? 'UTC',
+            },
+            refreshed,
+          );
+          return { success: true };
+        } catch {
+          // fall through to standard error handling
+        }
+      }
+    }
     const message = err instanceof Error ? err.message : 'Failed to update profile';
     return { success: false, error: message };
   }
@@ -62,6 +96,17 @@ export async function uploadAvatar(formData: FormData) {
     const data = await http.postForm('/auth/avatar', formData, token);
     return { success: true, avatarUrl: data.avatarUrl || null };
   } catch (err: unknown) {
+    if (isUnauthorizedError(err)) {
+      const refreshed = await getValidToken({ forceRefresh: true });
+      if (refreshed) {
+        try {
+          const data = await http.postForm('/auth/avatar', formData, refreshed);
+          return { success: true, avatarUrl: data.avatarUrl || null };
+        } catch {
+          // fall through to standard error handling
+        }
+      }
+    }
     const message = err instanceof Error ? err.message : 'Avatar upload failed';
     return { success: false, error: message, avatarUrl: null };
   }
@@ -76,6 +121,17 @@ export async function getSessions() {
     const data = await http.get('/auth/sessions', token);
     return { success: true, sessions: Array.isArray(data) ? data : [] };
   } catch (err: unknown) {
+    if (isUnauthorizedError(err)) {
+      const refreshed = await getValidToken({ forceRefresh: true });
+      if (refreshed) {
+        try {
+          const data = await http.get('/auth/sessions', refreshed);
+          return { success: true, sessions: Array.isArray(data) ? data : [] };
+        } catch {
+          // fall through to standard error handling
+        }
+      }
+    }
     const message = err instanceof Error ? err.message : 'Failed to fetch sessions';
     return { success: false, error: message, sessions: [] };
   }
@@ -90,6 +146,17 @@ export async function revokeSession(id: string) {
     await http.delete(`/auth/sessions/${id}`, token);
     return { success: true };
   } catch (err: unknown) {
+    if (isUnauthorizedError(err)) {
+      const refreshed = await getValidToken({ forceRefresh: true });
+      if (refreshed) {
+        try {
+          await http.delete(`/auth/sessions/${id}`, refreshed);
+          return { success: true };
+        } catch {
+          // fall through to standard error handling
+        }
+      }
+    }
     const message = err instanceof Error ? err.message : 'Failed to revoke session';
     return { success: false, error: message };
   }
@@ -118,6 +185,7 @@ export async function logoutAll() {
   };
   cookieStore.set('access_token', '', cookieOpts);
   cookieStore.set('refresh_token', '', cookieOpts);
+  cookieStore.set('platform_connections', '', cookieOpts);
 
   return { success: true };
 }

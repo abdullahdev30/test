@@ -1,7 +1,7 @@
 'use server';
 
-import { cookies } from 'next/headers';
-import { http } from '../http';
+import { http, type HttpError } from '../http';
+import { getValidToken } from './socialAuth';
 import {
   CreateWorkspaceSchema,
   UpdateWorkspaceSchema,
@@ -48,8 +48,11 @@ export interface BusinessProfile {
 
 /** Read access token from httpOnly cookies — server-side only */
 async function getAccessToken(): Promise<string | undefined> {
-  const cookieStore = await cookies();
-  return cookieStore.get('access_token')?.value;
+  return (await getValidToken()) ?? undefined;
+}
+
+function isUnauthorizedError(err: unknown): boolean {
+  return !!(err && typeof err === 'object' && (err as HttpError).status === 401);
 }
 
 // ─────────────────────────────────────────────
@@ -71,6 +74,18 @@ export async function createWorkspace(data: CreateWorkspaceInput) {
     const workspace: Workspace = result.workspace ?? result;
     return { success: true, workspace };
   } catch (err: unknown) {
+    if (isUnauthorizedError(err)) {
+      const refreshed = await getValidToken({ forceRefresh: true });
+      if (refreshed) {
+        try {
+          const result = await http.post('/workspace', parsed.data, refreshed);
+          const workspace: Workspace = result.workspace ?? result;
+          return { success: true, workspace };
+        } catch {
+          // fall through to standard error handling
+        }
+      }
+    }
     const message = err instanceof Error ? err.message : 'Failed to create workspace';
     return { success: false, error: message, workspace: null };
   }
@@ -86,6 +101,18 @@ export async function getMyWorkspace() {
     const workspace: Workspace = result.workspace ?? result;
     return { success: true, workspace };
   } catch (err: unknown) {
+    if (isUnauthorizedError(err)) {
+      const refreshed = await getValidToken({ forceRefresh: true });
+      if (refreshed) {
+        try {
+          const result = await http.get('/workspace/me', refreshed);
+          const workspace: Workspace = result.workspace ?? result;
+          return { success: true, workspace };
+        } catch {
+          // fall through to standard error handling
+        }
+      }
+    }
     const message = err instanceof Error ? err.message : 'Failed to fetch workspace';
     return { success: false, error: message, workspace: null };
   }
@@ -106,6 +133,18 @@ export async function updateMyWorkspace(data: UpdateWorkspaceInput) {
     const workspace: Workspace = result.workspace ?? result;
     return { success: true, workspace };
   } catch (err: unknown) {
+    if (isUnauthorizedError(err)) {
+      const refreshed = await getValidToken({ forceRefresh: true });
+      if (refreshed) {
+        try {
+          const result = await http.patch('/workspace/me', parsed.data, refreshed);
+          const workspace: Workspace = result.workspace ?? result;
+          return { success: true, workspace };
+        } catch {
+          // fall through to standard error handling
+        }
+      }
+    }
     const message = err instanceof Error ? err.message : 'Failed to update workspace';
     return { success: false, error: message, workspace: null };
   }
@@ -121,6 +160,18 @@ export async function getBusinessProfile() {
     const businessProfile: BusinessProfile = result.businessProfile ?? result;
     return { success: true, businessProfile };
   } catch (err: unknown) {
+    if (isUnauthorizedError(err)) {
+      const refreshed = await getValidToken({ forceRefresh: true });
+      if (refreshed) {
+        try {
+          const result = await http.get('/workspace/me/business-profile', refreshed);
+          const businessProfile: BusinessProfile = result.businessProfile ?? result;
+          return { success: true, businessProfile };
+        } catch {
+          // fall through to standard error handling
+        }
+      }
+    }
     const message = err instanceof Error ? err.message : 'Failed to fetch business profile';
     return { success: false, error: message, businessProfile: null };
   }
@@ -140,6 +191,17 @@ export async function upsertBusinessProfile(data: BusinessProfileInput) {
     await http.post('/workspace/me/business-profile', parsed.data, token);
     return { success: true };
   } catch (err: unknown) {
+    if (isUnauthorizedError(err)) {
+      const refreshed = await getValidToken({ forceRefresh: true });
+      if (refreshed) {
+        try {
+          await http.post('/workspace/me/business-profile', parsed.data, refreshed);
+          return { success: true };
+        } catch {
+          // fall through to standard error handling
+        }
+      }
+    }
     const message = err instanceof Error ? err.message : 'Failed to save business profile';
     return { success: false, error: message };
   }

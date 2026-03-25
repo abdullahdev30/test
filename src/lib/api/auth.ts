@@ -58,6 +58,7 @@ async function clearAuthCookies() {
   const cookieStore = await cookies();
   cookieStore.set('access_token', '', { ...COOKIE_OPTS, maxAge: 0 });
   cookieStore.set('refresh_token', '', { ...COOKIE_OPTS, maxAge: 0 });
+  cookieStore.set('platform_connections', '', { ...COOKIE_OPTS, maxAge: 0 });
 }
 
 // ─────────────────────────────────────────────

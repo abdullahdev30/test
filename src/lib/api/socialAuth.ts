@@ -29,20 +29,13 @@ export async function getRawToken(): Promise<string | undefined> {
 }
 
 /**
- * getValidToken()
+ * refreshAccessToken()
  *
- * Returns a valid access token string, or null if the session is fully dead.
- * Internally attempts a silent token refresh when the cookie is missing.
+ * Forces refresh using refresh_token cookie and rewrites access/refresh cookies.
+ * Returns fresh access token or null.
  */
-export async function getValidToken(): Promise<string | null> {
+export async function refreshAccessToken(): Promise<string | null> {
   const store = await cookies();
-  const token = store.get('access_token')?.value;
-
-  // Token present — use it as-is (backend will 401 if truly expired,
-  // but 15-min maxAge means it's almost always fresh).
-  if (token) return token;
-
-  // No access token — try a silent refresh using the refresh_token cookie.
   const refreshToken = store.get('refresh_token')?.value;
   if (!refreshToken) return null;
 
@@ -57,7 +50,7 @@ export async function getValidToken(): Promise<string | null> {
     });
 
     if (!res.ok) {
-      // Refresh token is invalid — clear both cookies so middleware picks it up.
+      // Refresh token is invalid — clear both cookies.
       store.set('access_token', '', { ...COOKIE_OPTS, maxAge: 0 });
       store.set('refresh_token', '', { ...COOKIE_OPTS, maxAge: 0 });
       return null;
@@ -78,4 +71,22 @@ export async function getValidToken(): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * getValidToken()
+ *
+ * Returns a valid access token string, or null if the session is fully dead.
+ * Internally attempts a silent token refresh when the cookie is missing.
+ */
+export async function getValidToken(options?: { forceRefresh?: boolean }): Promise<string | null> {
+  const store = await cookies();
+  const token = store.get('access_token')?.value;
+
+  // Token present — use it as-is (backend will 401 if truly expired,
+  // but 15-min maxAge means it's almost always fresh).
+  if (token && !options?.forceRefresh) return token;
+
+  // No access token — try a silent refresh using the refresh_token cookie.
+  return refreshAccessToken();
 }

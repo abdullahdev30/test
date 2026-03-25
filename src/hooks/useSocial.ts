@@ -14,7 +14,7 @@ export interface PlatformStatus {
 }
 
 const POLL_INTERVAL_MS = 20_000; // Auto-refresh every 20 seconds
-const PLATFORMS = ['instagram', 'google', 'facebook', 'linkedin'] as const;
+const PLATFORMS = ['instagram', 'google-business-profile', 'facebook', 'linkedin'] as const;
 type PlatformKey = (typeof PLATFORMS)[number];
 
 export function useSocial() {
@@ -54,7 +54,7 @@ export function useSocial() {
 
       const mappedConnections: Record<PlatformKey, PlatformStatus> = {
         instagram: { connected: false, status: 'disconnected', username: null, providerAccountName: null },
-        google: { connected: false, status: 'disconnected', username: null, providerAccountName: null },
+        'google-business-profile': { connected: false, status: 'disconnected', username: null, providerAccountName: null },
         facebook: { connected: false, status: 'disconnected', username: null, providerAccountName: null },
         linkedin: { connected: false, status: 'disconnected', username: null, providerAccountName: null },
       };

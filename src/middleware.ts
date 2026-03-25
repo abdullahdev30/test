@@ -46,7 +46,6 @@ export function middleware(request: NextRequest) {
   // This prevents unnecessary redirects when access token is missing but refresh token exists.
   const accessToken = request.cookies.get('access_token')?.value;
   const refreshToken = request.cookies.get('refresh_token')?.value;
-  const hasAccessToken = !!accessToken;
   const hasSessionCookie = !!(accessToken || refreshToken);
 
   // ── Protect BFF API routes — return 401 JSON (not a redirect) ───────────
@@ -58,7 +57,7 @@ export function middleware(request: NextRequest) {
   }
 
   // Redirect authenticated users away from auth pages
-  if (hasAccessToken && AUTH_ROUTES.some((r) => pathname === r)) {
+  if (hasSessionCookie && AUTH_ROUTES.some((r) => pathname === r)) {
     const response = NextResponse.redirect(new URL('/dashboard', request.url));
     return applySecurityHeaders(response);
   }
