@@ -57,23 +57,47 @@ export async function GET(
     });
 
     if (!response.ok) {
+      // For live status checks, treat non-2xx as disconnected and keep user on same page.
+      if (action === 'status') {
+        const connections = await getPlatformConnections();
+        delete connections[platform];
+        await setPlatformConnections(connections);
+        return NextResponse.json({
+          status: 'disconnected',
+          connected: false,
+          username: null,
+          providerAccountName: null,
+          connection: null,
+        });
+      }
       return NextResponse.json({ error: `Backend Error: ${response.status}` }, { status: response.status });
     }
 
     const data = await response.json();
 
-    // Sync username into the local cookie cache from live status
-    if (data?.status === 'connected') {
+    // Sync platform status into the local cookie cache from live status
+    if (action === 'status') {
       const conn = data?.connection;
       const username = conn?.providerAccountName || conn?.providerAccountId || data?.username || null;
-
       const connections = await getPlatformConnections();
-      connections[platform] = {
-        status: 'connected',
-        username,
-        providerAccountName: username,
-      };
+      if (data?.status === 'connected') {
+        connections[platform] = {
+          status: 'connected',
+          username,
+          providerAccountName: username,
+        };
+      } else {
+        delete connections[platform];
+      }
       await setPlatformConnections(connections);
+
+      return NextResponse.json({
+        ...data,
+        status: data?.status === 'connected' ? 'connected' : 'disconnected',
+        connected: data?.status === 'connected',
+        username: data?.status === 'connected' ? username : null,
+        providerAccountName: data?.status === 'connected' ? username : null,
+      });
     }
 
     return NextResponse.json(data);

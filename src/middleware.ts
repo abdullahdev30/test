@@ -42,26 +42,29 @@ function applySecurityHeaders(response: NextResponse): NextResponse {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Read the httpOnly access_token cookie (set by server actions)
-  const token = request.cookies.get('access_token')?.value;
-  const isAuthenticated = !!token;
+  // Read auth cookies. For protected routes/APIs, allow either access or refresh cookie.
+  // This prevents unnecessary redirects when access token is missing but refresh token exists.
+  const accessToken = request.cookies.get('access_token')?.value;
+  const refreshToken = request.cookies.get('refresh_token')?.value;
+  const hasAccessToken = !!accessToken;
+  const hasSessionCookie = !!(accessToken || refreshToken);
 
   // ── Protect BFF API routes — return 401 JSON (not a redirect) ───────────
   const PROTECTED_API_PREFIXES = ['/api/workspace', '/api/social'];
-  if (!isAuthenticated && PROTECTED_API_PREFIXES.some((p) => pathname.startsWith(p))) {
+  if (!hasSessionCookie && PROTECTED_API_PREFIXES.some((p) => pathname.startsWith(p))) {
     return applySecurityHeaders(
       NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     );
   }
 
   // Redirect authenticated users away from auth pages
-  if (isAuthenticated && AUTH_ROUTES.some((r) => pathname === r)) {
+  if (hasAccessToken && AUTH_ROUTES.some((r) => pathname === r)) {
     const response = NextResponse.redirect(new URL('/dashboard', request.url));
     return applySecurityHeaders(response);
   }
 
   // Redirect unauthenticated users away from protected pages
-  if (!isAuthenticated && PROTECTED_PREFIXES.some((p) => pathname.startsWith(p))) {
+  if (!hasSessionCookie && PROTECTED_PREFIXES.some((p) => pathname.startsWith(p))) {
     const callbackUrl = encodeURIComponent(pathname);
     const response = NextResponse.redirect(
       new URL(`/login?callbackUrl=${callbackUrl}`, request.url),

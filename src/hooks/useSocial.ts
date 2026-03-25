@@ -14,6 +14,8 @@ export interface PlatformStatus {
 }
 
 const POLL_INTERVAL_MS = 20_000; // Auto-refresh every 20 seconds
+const PLATFORMS = ['instagram', 'google', 'facebook', 'linkedin'] as const;
+type PlatformKey = (typeof PLATFORMS)[number];
 
 export function useSocial() {
   const [loading, setLoading] = useState<Record<string, boolean>>({});
@@ -21,35 +23,61 @@ export function useSocial() {
   const [error, setError] = useState<Record<string, string | null>>({});
 
   /**
-   * REFRESH ALL: Syncs the UI with the platform_connections cookie/backend.
-   * This is the single source of truth for the "Live/Off" status.
+   * REFRESH ALL: Calls live status API for each platform and updates button state.
    */
   const refreshAll = useCallback(async () => {
     try {
-      const res = await fetch('/api/social/connections', { 
-        cache: 'no-store',
-        credentials: 'same-origin' 
-      });
+      const responses = await Promise.all(
+        PLATFORMS.map(async (platform) => {
+          try {
+            const res = await fetch(`/api/social/${platform}/status`, {
+              cache: 'no-store',
+              credentials: 'same-origin',
+            });
 
-      if (res.status === 401) return; // Silent skip if session is dead
-      if (!res.ok) return;
+            if (res.status === 401) {
+              return { platform, unauthorized: true, data: null as Record<string, unknown> | null };
+            }
+            if (!res.ok) {
+              return { platform, unauthorized: false, data: null as Record<string, unknown> | null };
+            }
 
-      const data = await res.json();
+            const data = (await res.json()) as Record<string, unknown>;
+            return { platform, unauthorized: false, data };
+          } catch {
+            return { platform, unauthorized: false, data: null as Record<string, unknown> | null };
+          }
+        }),
+      );
 
-      if (data.connections) {
-        const mappedConnections = Object.keys(data.connections).reduce((acc, key) => {
-          const conn = data.connections[key];
-          acc[key] = {
-            ...conn,
-            // Ensure UI has a valid string for the username badge
-            providerAccountName: conn.providerAccountName || conn.username || null,
-            connected: conn.status === 'connected' || conn.connected === true
-          };
-          return acc;
-        }, {} as Record<string, PlatformStatus>);
+      if (responses.some((r) => r.unauthorized)) return;
 
-        setStatusData(mappedConnections);
+      const mappedConnections: Record<PlatformKey, PlatformStatus> = {
+        instagram: { connected: false, status: 'disconnected', username: null, providerAccountName: null },
+        google: { connected: false, status: 'disconnected', username: null, providerAccountName: null },
+        facebook: { connected: false, status: 'disconnected', username: null, providerAccountName: null },
+        linkedin: { connected: false, status: 'disconnected', username: null, providerAccountName: null },
+      };
+
+      for (const item of responses) {
+        const status = item.data?.status as string | undefined;
+        const connection = item.data?.connection as Record<string, unknown> | undefined;
+        const username =
+          (item.data?.providerAccountName as string | null | undefined) ??
+          (item.data?.username as string | null | undefined) ??
+          (connection?.providerAccountName as string | null | undefined) ??
+          (connection?.providerAccountId as string | null | undefined) ??
+          null;
+
+        mappedConnections[item.platform] = {
+          connected: status === 'connected',
+          status: status === 'connected' ? 'connected' : 'disconnected',
+          username: status === 'connected' ? username : null,
+          providerAccountName: status === 'connected' ? username : null,
+        };
       }
+
+      setStatusData(mappedConnections);
     } catch (err) {
       console.error("Failed to sync social status:", err);
     }

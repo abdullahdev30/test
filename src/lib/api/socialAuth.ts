@@ -14,7 +14,8 @@ import { cookies } from 'next/headers';
 const COOKIE_OPTS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
-  sameSite: 'strict' as const,
+  // Must be lax for OAuth callback compatibility
+  sameSite: 'lax' as const,
   path: '/',
   maxAge: 60 * 60 * 24, // 1 day (access token)
 };

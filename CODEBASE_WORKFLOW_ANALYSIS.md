@@ -2,6 +2,13 @@
 
 Last updated: 2026-03-25
 
+## Recent Update (Connections Flow Fix)
+
+- Switched social status refresh to call live per-platform `status` APIs (`/api/social/{platform}/status`) before rendering Connect/Disconnect buttons.
+- Updated social callback behavior to stay in `/connections` with an error query instead of forcing `/login` redirect when callback token resolution fails.
+- Standardized social refresh/callback auth cookies to `SameSite=lax` to preserve OAuth callback compatibility.
+- Updated middleware to treat `refresh_token` as a valid session cookie for protected route/API access checks.
+
 ## 1) Scope
 
 This analysis covers the full **app-authored codebase** (all project files except generated/dependency folders such as `node_modules/` and `.next/`).

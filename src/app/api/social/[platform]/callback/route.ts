@@ -41,7 +41,7 @@ async function silentRefresh(): Promise<string | null> {
     cookieStore.set('access_token', newAccessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict' as const,
+      sameSite: 'lax' as const,
       path: '/',
       maxAge: 60 * 60 * 24,
     });
@@ -49,7 +49,7 @@ async function silentRefresh(): Promise<string | null> {
       cookieStore.set('refresh_token', newRefreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict' as const,
+        sameSite: 'lax' as const,
         path: '/',
         maxAge: 60 * 60 * 24 * 7,
       });
@@ -105,8 +105,10 @@ export async function GET(
   }
 
   if (!token) {
-    // Both token AND refresh failed — only now send to /login as last resort
-    return NextResponse.redirect(new URL('/login?callbackUrl=/connections', request.url));
+    // Stay on the connections screen and show an inline error instead of forcing login.
+    return NextResponse.redirect(
+      new URL(`/connections?error=session_expired&platform=${platform}`, request.url)
+    );
   }
 
   // ── 3. Forward code+state to backend ─────────────────────────────────────
