@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Calendar, Briefcase,
-  Settings, LogOut, ChevronLeft, ChevronRight, Loader2, Link2
+  Settings, LogOut, ChevronLeft, ChevronRight, Loader2, Link2, FileText
 } from 'lucide-react';
 import { useUser } from '@/hooks/useUser';
 import { logout } from '@/lib/api/auth';
@@ -13,6 +13,7 @@ const menuItems = [
   { name: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
   { name: 'Workspace', icon: Briefcase, href: '/workspace' },
   { name: 'Connections', icon: Link2, href: '/connections' },
+  { name: 'Posts', icon: FileText, href: '/posts' },
   { name: 'Scheduler', icon: Calendar, href: '/scheduler' },
   { name: 'Settings', icon: Settings, href: '/settings' },
 ];
