@@ -2,21 +2,24 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
-import { ArrowLeft, CalendarDays, Clock3, ImagePlus, Link2, Plus, Save, Send, ShieldCheck, ShieldX } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, CalendarDays, Clock3, Eye, ImagePlus, Link2, Save, Send, ShieldCheck, ShieldX } from 'lucide-react';
 import { usePosts } from '@/hooks/usePosts';
 import type { PostAsset } from '@/lib/api/posts';
 import type { UpdatePostInput } from '@/lib/schemas';
 
-type PublishMode = 'manualDraft' | 'scheduled';
+type PublishMode = 'manual' | 'manualDraft' | 'scheduled';
+type TabKey = 'overview' | 'edit' | 'assets';
 type AssetType = 'image' | 'video' | 'document';
-interface PostDraft {
+
+interface EditDraft {
   title: string;
   captionText: string;
   publishMode: PublishMode;
   dateValue: string;
   timeValue: string;
   sourceTimezone: string;
+  metadataNote: string;
 }
 
 function toDateInput(value?: string | null): string {
@@ -41,33 +44,28 @@ function combineDateAndTime(dateValue: string, timeValue: string): string | null
   return Number.isNaN(Date.parse(iso)) ? null : iso;
 }
 
+function getAssetUrl(asset: PostAsset): string {
+  return (asset.previewUrl as string | undefined) ?? (asset.url as string | undefined) ?? '';
+}
+
+function formatStatus(value?: string): string {
+  return (value ?? 'draft').replace(/([A-Z])/g, ' $1').replace(/[_-]/g, ' ').trim();
+}
+
+function formatDateTime(value?: string | null): string {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+}
+
 function inferAssetType(file: File): AssetType {
   if (file.type.startsWith('image/')) return 'image';
   if (file.type.startsWith('video/')) return 'video';
   return 'document';
 }
 
-function getAssetUrl(asset: PostAsset): string {
-  return (asset.previewUrl as string | undefined) ?? (asset.url as string | undefined) ?? '';
-}
-
-function formatStatus(raw?: string): string {
-  if (!raw) return 'draft';
-  return raw.replace(/([A-Z])/g, ' $1').replace(/[_-]/g, ' ').trim();
-}
-
-function buildDraft(post: { title?: string; captionText?: string; publishMode?: string; scheduledFor?: string | null; sourceTimezone?: string }): PostDraft {
-  return {
-    title: post.title ?? '',
-    captionText: post.captionText ?? '',
-    publishMode: post.publishMode === 'scheduled' ? 'scheduled' : 'manualDraft',
-    dateValue: toDateInput(post.scheduledFor),
-    timeValue: toTimeInput(post.scheduledFor),
-    sourceTimezone: post.sourceTimezone ?? 'UTC',
-  };
-}
-
-export default function PostDetailPage() {
+export default function AutomationPostDetailsPage() {
   const params = useParams<{ id: string }>();
   const postId = params?.id ?? '';
 
@@ -77,9 +75,8 @@ export default function PostDetailPage() {
     getPostByIdFromStore,
     refreshFromApi,
     updateExistingPost,
-    uploadAssetFile,
     attachAssetsByUrl,
-    setTargetsForPost,
+    uploadAssetFile,
     queuePublish,
     approveExistingPost,
     rejectExistingPost,
@@ -87,133 +84,116 @@ export default function PostDetailPage() {
 
   const post = useMemo(() => getPostByIdFromStore(postId), [getPostByIdFromStore, postId]);
 
-  const [draftById, setDraftById] = useState<Record<string, PostDraft>>({});
-
-  const [fileAsset, setFileAsset] = useState<File | null>(null);
-  const [urlAsset, setUrlAsset] = useState('');
-  const [urlAssetType, setUrlAssetType] = useState<AssetType>('image');
-  const [targetProvider, setTargetProvider] = useState('linkedin');
-  const [targetSocialConnectionId, setTargetSocialConnectionId] = useState('');
-  const [targetProviderTargetId, setTargetProviderTargetId] = useState('');
-  const [targetProviderTargetName, setTargetProviderTargetName] = useState('');
-  const [targetDateValue, setTargetDateValue] = useState('');
-  const [targetTimeValue, setTargetTimeValue] = useState('');
+  const [activeTab, setActiveTab] = useState<TabKey>('overview');
+  const [draft, setDraft] = useState<EditDraft | null>(null);
+  const [assetFile, setAssetFile] = useState<File | null>(null);
+  const [assetUrl, setAssetUrl] = useState('');
+  const [assetUrlType, setAssetUrlType] = useState<AssetType>('image');
   const [reviewReason, setReviewReason] = useState('Approved by user');
-
-  const [savingPost, setSavingPost] = useState(false);
-  const [savingFileAsset, setSavingFileAsset] = useState(false);
-  const [savingUrlAsset, setSavingUrlAsset] = useState(false);
-  const [savingTargets, setSavingTargets] = useState(false);
-  const [savingQueuePublish, setSavingQueuePublish] = useState(false);
-  const [savingApprove, setSavingApprove] = useState(false);
-  const [savingReject, setSavingReject] = useState(false);
-  const [formNotice, setFormNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
-  const activeDraft = useMemo(
-    () => (post ? draftById[post.id] ?? buildDraft(post) : null),
-    [post, draftById],
-  );
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isAttaching, setIsAttaching] = useState(false);
+  const [isQueueing, setIsQueueing] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
+  const [isRejecting, setIsRejecting] = useState(false);
 
-  function updateActiveDraft(patch: Partial<PostDraft>) {
-    if (!post || !activeDraft) return;
-    setDraftById((prev) => ({
-      ...prev,
-      [post.id]: { ...activeDraft, ...patch },
-    }));
-  }
-
-  function resetActiveDraft() {
+  useEffect(() => {
     if (!post) return;
-    setDraftById((prev) => {
-      const next = { ...prev };
-      delete next[post.id];
-      return next;
+    setDraft({
+      title: post.title ?? '',
+      captionText: post.captionText ?? '',
+      publishMode: post.publishMode === 'scheduled' ? 'scheduled' : post.publishMode === 'manualDraft' ? 'manualDraft' : 'manual',
+      dateValue: toDateInput(post.scheduledFor),
+      timeValue: toTimeInput(post.scheduledFor),
+      sourceTimezone: post.sourceTimezone ?? 'UTC',
+      metadataNote: String((post.metadata as Record<string, unknown> | undefined)?.note ?? ''),
     });
-  }
+  }, [post]);
 
-  async function savePost() {
-    if (!postId) return;
+  async function handleSave() {
+    if (!postId || !draft) return;
     setFormError(null);
-    setFormNotice(null);
+    setNotice(null);
 
-    if (!activeDraft) {
-      setFormError('Post is not ready for editing.');
+    if (!draft.title.trim()) {
+      setFormError('Title is required.');
       return;
     }
 
-    if (!activeDraft.title.trim()) {
-      setFormError('Post title is required.');
-      return;
-    }
-
-    const scheduledFor = activeDraft.publishMode === 'scheduled'
-      ? combineDateAndTime(activeDraft.dateValue, activeDraft.timeValue)
+    const scheduledFor = draft.publishMode === 'scheduled'
+      ? combineDateAndTime(draft.dateValue, draft.timeValue)
       : null;
-    if (activeDraft.publishMode === 'scheduled' && !scheduledFor) {
-      setFormError('Please set both date and time.');
+
+    if (draft.publishMode === 'scheduled' && !scheduledFor) {
+      setFormError('Scheduled mode requires date and time.');
       return;
     }
 
     const payload: UpdatePostInput = {
-      title: activeDraft.title.trim(),
-      captionText: activeDraft.captionText.trim(),
-      publishMode: activeDraft.publishMode,
-      sourceTimezone: activeDraft.sourceTimezone.trim() || 'UTC',
+      title: draft.title.trim(),
+      captionText: draft.captionText.trim(),
+      publishMode: draft.publishMode === 'manualDraft' ? 'manual' : draft.publishMode,
+      sourceTimezone: draft.sourceTimezone.trim() || 'UTC',
       scheduledFor: scheduledFor ?? null,
+      metadata: draft.metadataNote.trim() ? { note: draft.metadataNote.trim() } : undefined,
     };
 
-    setSavingPost(true);
+    setIsSaving(true);
     try {
       const result = await updateExistingPost(postId, payload);
       if (!result.success) {
         setFormError(result.error ?? 'Failed to update post.');
         return;
       }
-      resetActiveDraft();
-      setFormNotice('Post updated successfully.');
+      setNotice('Post updated successfully.');
+      await refreshFromApi();
+      setActiveTab('overview');
     } finally {
-      setSavingPost(false);
+      setIsSaving(false);
     }
   }
 
-  async function uploadFileAsset() {
-    if (!postId || !fileAsset) return;
+  async function handleUploadFile() {
+    if (!postId || !assetFile) return;
     setFormError(null);
-    setFormNotice(null);
-    setSavingFileAsset(true);
+    setNotice(null);
+    setIsUploading(true);
     try {
       const result = await uploadAssetFile(postId, {
-        file: fileAsset,
-        assetType: inferAssetType(fileAsset),
+        file: assetFile,
+        assetType: inferAssetType(assetFile),
       });
       if (!result.success) {
-        setFormError(result.error ?? 'Failed to upload file asset.');
+        setFormError(result.error ?? 'Failed to upload asset.');
         return;
       }
-      setFormNotice('Asset uploaded successfully.');
-      setFileAsset(null);
+      setNotice('Asset uploaded successfully.');
+      setAssetFile(null);
+      await refreshFromApi();
     } finally {
-      setSavingFileAsset(false);
+      setIsUploading(false);
     }
   }
 
-  async function attachUrlAsset() {
+  async function handleAttachUrl() {
     if (!postId) return;
     setFormError(null);
-    setFormNotice(null);
+    setNotice(null);
 
-    if (!urlAsset.trim()) {
+    if (!assetUrl.trim()) {
       setFormError('Asset URL is required.');
       return;
     }
 
-    setSavingUrlAsset(true);
+    setIsAttaching(true);
     try {
       const result = await attachAssetsByUrl(postId, {
         assets: [
           {
-            assetType: urlAssetType,
-            sourceUrl: urlAsset.trim(),
+            assetType: assetUrlType,
+            sourceUrl: assetUrl.trim(),
           },
         ],
       });
@@ -221,113 +201,79 @@ export default function PostDetailPage() {
         setFormError(result.error ?? 'Failed to attach URL asset.');
         return;
       }
-      setFormNotice('URL asset attached successfully.');
-      setUrlAsset('');
+      setNotice('Asset attached successfully.');
+      setAssetUrl('');
+      await refreshFromApi();
     } finally {
-      setSavingUrlAsset(false);
+      setIsAttaching(false);
     }
   }
 
-  async function setTargets() {
+  async function handleQueue() {
     if (!postId) return;
     setFormError(null);
-    setFormNotice(null);
-
-    if (!targetSocialConnectionId.trim()) {
-      setFormError('socialConnectionId is required to set targets.');
-      return;
-    }
-
-    const scheduledFor = combineDateAndTime(targetDateValue, targetTimeValue);
-
-    setSavingTargets(true);
-    try {
-      const result = await setTargetsForPost(postId, {
-        targets: [
-          {
-            provider: targetProvider.trim(),
-            socialConnectionId: targetSocialConnectionId.trim(),
-            providerTargetId: targetProviderTargetId.trim() || undefined,
-            providerTargetName: targetProviderTargetName.trim() || undefined,
-            scheduledFor: scheduledFor ?? undefined,
-          },
-        ],
-      });
-
-      if (!result.success) {
-        setFormError(result.error ?? 'Failed to set targets.');
-        return;
-      }
-
-      setFormNotice('Targets updated successfully.');
-    } finally {
-      setSavingTargets(false);
-    }
-  }
-
-  async function queuePostForPublish() {
-    if (!postId) return;
-    setFormError(null);
-    setFormNotice(null);
-    setSavingQueuePublish(true);
+    setNotice(null);
+    setIsQueueing(true);
     try {
       const result = await queuePublish(postId);
       if (!result.success) {
-        setFormError(result.error ?? 'Failed to queue post.');
+        setFormError(result.error ?? 'Failed to queue publish.');
         return;
       }
-      setFormNotice('Post queued for publishing.');
+      setNotice('Post queued for publishing.');
+      await refreshFromApi();
     } finally {
-      setSavingQueuePublish(false);
+      setIsQueueing(false);
     }
   }
 
-  async function approvePostNow() {
+  async function handleApprove() {
     if (!postId) return;
     setFormError(null);
-    setFormNotice(null);
-    setSavingApprove(true);
+    setNotice(null);
+    setIsApproving(true);
     try {
       const result = await approveExistingPost(postId, reviewReason || 'Approved by user');
       if (!result.success) {
-        setFormError(result.error ?? 'Failed to approve post.');
+        setFormError(result.error ?? 'Failed to approve.');
         return;
       }
-      setFormNotice('Post approved successfully.');
+      setNotice('Post approved.');
+      await refreshFromApi();
     } finally {
-      setSavingApprove(false);
+      setIsApproving(false);
     }
   }
 
-  async function rejectPostNow() {
+  async function handleReject() {
     if (!postId) return;
     setFormError(null);
-    setFormNotice(null);
+    setNotice(null);
     if (!reviewReason.trim()) {
       setFormError('Reject reason is required.');
       return;
     }
-
-    setSavingReject(true);
+    setIsRejecting(true);
     try {
       const result = await rejectExistingPost(postId, reviewReason.trim());
       if (!result.success) {
-        setFormError(result.error ?? 'Failed to reject post.');
+        setFormError(result.error ?? 'Failed to reject.');
         return;
       }
-      setFormNotice('Post rejected successfully.');
+      setNotice('Post rejected.');
+      await refreshFromApi();
     } finally {
-      setSavingReject(false);
+      setIsRejecting(false);
     }
   }
 
   return (
     <section className="p-6 lg:p-10 max-w-6xl mx-auto min-h-screen">
-      <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div className="mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-black text-text-primary tracking-tight">Post Details</h1>
+          <h1 className="text-4xl font-black text-text-primary tracking-tight">Automation Post</h1>
           <p className="text-text-secondary mt-2 font-medium">
-            Full post page with edit and asset management.
+            Single post details, edit, approval, queue, and asset preview.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -336,334 +282,330 @@ export default function PostDetailPage() {
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-text-secondary/20 text-text-secondary hover:text-text-primary hover:border-text-secondary/40 transition-colors font-bold"
           >
             <ArrowLeft size={16} />
-            Back
+            Back to Automation
           </Link>
           <Link
             href="/posts/new"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-white font-bold hover:opacity-90 transition-opacity"
           >
-            <Plus size={16} />
-            Create Post
+            New Post
           </Link>
         </div>
       </div>
 
-      {(error || formError || formNotice) && (
+      {(error || formError || notice) && (
         <div className="mb-6 rounded-2xl border border-text-secondary/10 bg-bg-primary px-4 py-3 text-sm font-medium">
           {error && <p className="text-red-600">{error}</p>}
           {formError && <p className="text-red-600">{formError}</p>}
-          {formNotice && <p className="text-emerald-600">{formNotice}</p>}
+          {notice && <p className="text-emerald-700">{notice}</p>}
         </div>
       )}
 
       {!post && isLoading && (
-        <div className="rounded-2xl border border-text-secondary/10 bg-bg-primary p-6">
-          <p className="text-text-secondary">Loading post...</p>
+        <div className="rounded-2xl border border-text-secondary/10 bg-bg-primary p-6 text-text-secondary">
+          Loading post...
         </div>
       )}
 
       {!post && !isLoading && (
         <div className="rounded-2xl border border-text-secondary/10 bg-bg-primary p-6">
-          <h2 className="text-xl font-black text-text-primary mb-2">Post Not Found In Cache</h2>
-          <p className="text-text-secondary mb-4">
-            This post is not available in local cache yet. You can fetch latest posts once.
-          </p>
+          <h2 className="text-xl font-black text-text-primary mb-2">Post Not Found</h2>
+          <p className="text-text-secondary mb-4">The post was not found in local store. Refresh to load latest.</p>
           <button
             type="button"
             onClick={() => refreshFromApi()}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-white font-bold hover:opacity-90 transition-opacity"
+            className="px-4 py-2.5 rounded-xl bg-primary text-white font-bold hover:opacity-90 transition-opacity"
           >
-            Refresh Posts
+            Refresh
           </button>
         </div>
       )}
 
-      {post && (
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-6">
-          <div className="bg-bg-primary rounded-[28px] border border-text-secondary/10 p-6 md:p-8 space-y-5">
-            <div className="flex flex-wrap items-center gap-3 text-sm">
-              <span className="px-2.5 py-1 rounded-full bg-secondary text-text-secondary font-bold">
-                {formatStatus(post.status ?? post.publishMode)}
-              </span>
-              <span className="text-text-secondary">Post ID: {post.id}</span>
+      {post && draft && (
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-6">
+          <div className="bg-bg-primary rounded-[28px] border border-text-secondary/10 p-6 md:p-8">
+            <div className="flex flex-wrap gap-2 mb-6">
+              <TabButton active={activeTab === 'overview'} onClick={() => setActiveTab('overview')} label="Overview" />
+              <TabButton active={activeTab === 'edit'} onClick={() => setActiveTab('edit')} label="Edit" />
+              <TabButton active={activeTab === 'assets'} onClick={() => setActiveTab('assets')} label="Assets" />
             </div>
 
-            <label className="text-sm font-bold text-text-primary block">
-              Title
-              <input
-                className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40"
-                value={activeDraft?.title ?? ''}
-                onChange={(event) => updateActiveDraft({ title: event.target.value })}
-              />
-            </label>
-
-            <label className="text-sm font-bold text-text-primary block">
-              Caption
-              <textarea
-                className="mt-1.5 w-full min-h-[170px] rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40"
-                value={activeDraft?.captionText ?? ''}
-                onChange={(event) => updateActiveDraft({ captionText: event.target.value })}
-              />
-            </label>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <label className="text-sm font-bold text-text-primary block">
-                Publish Mode
-                <select
-                  className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40"
-                  value={activeDraft?.publishMode ?? 'manualDraft'}
-                  onChange={(event) => updateActiveDraft({ publishMode: event.target.value as PublishMode })}
-                >
-                  <option value="manualDraft">Manual Draft</option>
-                  <option value="scheduled">Scheduled</option>
-                </select>
-              </label>
-
-              <label className="text-sm font-bold text-text-primary block">
-                <span className="inline-flex items-center gap-2">
-                  <CalendarDays size={15} />
-                  Day
-                </span>
-                <input
-                  type="date"
-                  className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40"
-                  value={activeDraft?.dateValue ?? ''}
-                  onChange={(event) => updateActiveDraft({ dateValue: event.target.value })}
-                  disabled={activeDraft?.publishMode !== 'scheduled'}
-                />
-              </label>
-
-              <label className="text-sm font-bold text-text-primary block">
-                <span className="inline-flex items-center gap-2">
-                  <Clock3 size={15} />
-                  Time
-                </span>
-                <input
-                  type="time"
-                  className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40"
-                  value={activeDraft?.timeValue ?? ''}
-                  onChange={(event) => updateActiveDraft({ timeValue: event.target.value })}
-                  disabled={activeDraft?.publishMode !== 'scheduled'}
-                />
-              </label>
-            </div>
-
-            <label className="text-sm font-bold text-text-primary block">
-              Source Timezone
-              <input
-                className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40"
-                value={activeDraft?.sourceTimezone ?? 'UTC'}
-                onChange={(event) => updateActiveDraft({ sourceTimezone: event.target.value })}
-              />
-            </label>
-
-            <button
-              type="button"
-              disabled={savingPost}
-              onClick={savePost}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-white font-bold hover:opacity-90 transition-opacity disabled:opacity-60"
-            >
-              <Save size={16} />
-              {savingPost ? 'Saving...' : 'Save Post'}
-            </button>
-          </div>
-
-          <aside className="bg-bg-primary rounded-[28px] border border-text-secondary/10 p-6 space-y-6 h-fit">
-            <div>
-              <h2 className="text-xl font-black text-text-primary mb-3">Attach Asset</h2>
-              <label className="text-sm font-bold text-text-primary block">
-                <span className="inline-flex items-center gap-2">
-                  <ImagePlus size={15} />
-                  Upload Image/Video
-                </span>
-                <input
-                  type="file"
-                  accept="image/*,video/*"
-                  className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
-                  onChange={(event) => setFileAsset(event.target.files?.[0] ?? null)}
-                />
-              </label>
-              <button
-                type="button"
-                disabled={!fileAsset || savingFileAsset}
-                onClick={uploadFileAsset}
-                className="mt-3 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-primary/30 text-primary font-bold hover:bg-primary/5 transition-colors disabled:opacity-60"
-              >
-                <ImagePlus size={14} />
-                {savingFileAsset ? 'Uploading...' : 'Upload File'}
-              </button>
-            </div>
-
-            <div className="pt-4 border-t border-text-secondary/10">
-              <h2 className="text-xl font-black text-text-primary mb-3">Targets & Queue</h2>
-              <label className="text-sm font-bold text-text-primary block">
-                Provider
-                <input
-                  className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
-                  value={targetProvider}
-                  onChange={(event) => setTargetProvider(event.target.value)}
-                />
-              </label>
-              <label className="text-sm font-bold text-text-primary block mt-3">
-                socialConnectionId (UUID)
-                <input
-                  className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
-                  value={targetSocialConnectionId}
-                  onChange={(event) => setTargetSocialConnectionId(event.target.value)}
-                />
-              </label>
-              <label className="text-sm font-bold text-text-primary block mt-3">
-                providerTargetId (optional)
-                <input
-                  className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
-                  value={targetProviderTargetId}
-                  onChange={(event) => setTargetProviderTargetId(event.target.value)}
-                />
-              </label>
-              <label className="text-sm font-bold text-text-primary block mt-3">
-                providerTargetName (optional)
-                <input
-                  className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
-                  value={targetProviderTargetName}
-                  onChange={(event) => setTargetProviderTargetName(event.target.value)}
-                />
-              </label>
-              <div className="grid grid-cols-2 gap-2 mt-3">
-                <input
-                  type="date"
-                  className="rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
-                  value={targetDateValue}
-                  onChange={(event) => setTargetDateValue(event.target.value)}
-                />
-                <input
-                  type="time"
-                  className="rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
-                  value={targetTimeValue}
-                  onChange={(event) => setTargetTimeValue(event.target.value)}
-                />
+            {activeTab === 'overview' && (
+              <div className="space-y-4">
+                <DetailRow label="Title" value={post.title || '-'} />
+                <DetailRow label="Caption" value={post.captionText || '-'} multiline />
+                <DetailRow label="Status" value={formatStatus(post.status)} />
+                <DetailRow label="Approval Status" value={post.approvalStatus || '-'} />
+                <DetailRow label="Publish Mode" value={post.publishMode || '-'} />
+                <DetailRow label="Publish/Schedule Time" value={formatDateTime(post.scheduledFor)} />
+                <DetailRow label="Source Type" value={post.sourceType || 'manual'} />
+                <DetailRow label="Timezone" value={post.sourceTimezone || '-'} />
+                <DetailRow label="Created At" value={formatDateTime(post.createdAt)} />
+                <DetailRow label="Updated At" value={formatDateTime(post.updatedAt)} />
+                <DetailRow label="Assets" value={String(Array.isArray(post.assets) ? post.assets.length : 0)} />
               </div>
-              <button
-                type="button"
-                disabled={savingTargets}
-                onClick={setTargets}
-                className="mt-3 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-primary/30 text-primary font-bold hover:bg-primary/5 transition-colors disabled:opacity-60"
-              >
-                <Save size={14} />
-                {savingTargets ? 'Saving Targets...' : 'Set Targets'}
-              </button>
-              <button
-                type="button"
-                disabled={savingQueuePublish}
-                onClick={queuePostForPublish}
-                className="mt-2 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-300 text-emerald-700 font-bold hover:bg-emerald-50 transition-colors disabled:opacity-60"
-              >
-                <Send size={14} />
-                {savingQueuePublish ? 'Queueing...' : 'Queue Publish'}
-              </button>
-            </div>
+            )}
 
-            <div className="pt-4 border-t border-text-secondary/10">
-              <h2 className="text-xl font-black text-text-primary mb-3">Approval Actions</h2>
-              <label className="text-sm font-bold text-text-primary block">
-                Reason
-                <input
-                  className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
-                  value={reviewReason}
-                  onChange={(event) => setReviewReason(event.target.value)}
-                />
-              </label>
-              <div className="flex items-center gap-2 mt-3">
+            {activeTab === 'edit' && (
+              <div className="space-y-4">
+                <label className="text-sm font-bold text-text-primary block">
+                  Title
+                  <input
+                    value={draft.title}
+                    onChange={(event) => setDraft((prev) => (prev ? { ...prev, title: event.target.value } : prev))}
+                    className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
+                  />
+                </label>
+                <label className="text-sm font-bold text-text-primary block">
+                  Caption
+                  <textarea
+                    value={draft.captionText}
+                    onChange={(event) => setDraft((prev) => (prev ? { ...prev, captionText: event.target.value } : prev))}
+                    className="mt-1.5 w-full min-h-[130px] rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
+                  />
+                </label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <label className="text-sm font-bold text-text-primary block">
+                    Publish Mode
+                    <select
+                      value={draft.publishMode}
+                      onChange={(event) => setDraft((prev) => (prev ? { ...prev, publishMode: event.target.value as PublishMode } : prev))}
+                      className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
+                    >
+                      <option value="manual">Manual</option>
+                      <option value="scheduled">Scheduled</option>
+                    </select>
+                  </label>
+                  <label className="text-sm font-bold text-text-primary block">
+                    Source Timezone
+                    <input
+                      value={draft.sourceTimezone}
+                      onChange={(event) => setDraft((prev) => (prev ? { ...prev, sourceTimezone: event.target.value } : prev))}
+                      className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
+                    />
+                  </label>
+                </div>
+
+                {draft.publishMode === 'scheduled' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <label className="text-sm font-bold text-text-primary block">
+                      <span className="inline-flex items-center gap-2">
+                        <CalendarDays size={15} />
+                        Day
+                      </span>
+                      <input
+                        type="date"
+                        value={draft.dateValue}
+                        onChange={(event) => setDraft((prev) => (prev ? { ...prev, dateValue: event.target.value } : prev))}
+                        className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
+                      />
+                    </label>
+                    <label className="text-sm font-bold text-text-primary block">
+                      <span className="inline-flex items-center gap-2">
+                        <Clock3 size={15} />
+                        Time
+                      </span>
+                      <input
+                        type="time"
+                        value={draft.timeValue}
+                        onChange={(event) => setDraft((prev) => (prev ? { ...prev, timeValue: event.target.value } : prev))}
+                        className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
+                      />
+                    </label>
+                  </div>
+                )}
+
+                <label className="text-sm font-bold text-text-primary block">
+                  Metadata Note
+                  <input
+                    value={draft.metadataNote}
+                    onChange={(event) => setDraft((prev) => (prev ? { ...prev, metadataNote: event.target.value } : prev))}
+                    className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
+                  />
+                </label>
+
                 <button
                   type="button"
-                  disabled={savingApprove}
-                  onClick={approvePostNow}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-emerald-300 text-emerald-700 font-bold hover:bg-emerald-50 transition-colors disabled:opacity-60"
+                  disabled={isSaving}
+                  onClick={handleSave}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-white font-bold hover:opacity-90 transition-opacity disabled:opacity-60"
                 >
-                  <ShieldCheck size={14} />
-                  {savingApprove ? 'Approving...' : 'Approve'}
-                </button>
-                <button
-                  type="button"
-                  disabled={savingReject}
-                  onClick={rejectPostNow}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-red-300 text-red-700 font-bold hover:bg-red-50 transition-colors disabled:opacity-60"
-                >
-                  <ShieldX size={14} />
-                  {savingReject ? 'Rejecting...' : 'Reject'}
+                  <Save size={15} />
+                  {isSaving ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
-            </div>
+            )}
 
-            <div>
-              <label className="text-sm font-bold text-text-primary block">
-                <span className="inline-flex items-center gap-2">
-                  <Link2 size={15} />
-                  Attach Asset URL
-                </span>
-                <input
-                  className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40"
-                  placeholder="https://example.com/asset.jpg"
-                  value={urlAsset}
-                  onChange={(event) => setUrlAsset(event.target.value)}
-                />
-              </label>
-              <select
-                className="mt-2 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40"
-                value={urlAssetType}
-                onChange={(event) => setUrlAssetType(event.target.value as AssetType)}
-              >
-                <option value="image">Image</option>
-                <option value="video">Video</option>
-                <option value="document">Document</option>
-              </select>
-              <button
-                type="button"
-                disabled={!urlAsset.trim() || savingUrlAsset}
-                onClick={attachUrlAsset}
-                className="mt-3 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-primary/30 text-primary font-bold hover:bg-primary/5 transition-colors disabled:opacity-60"
-              >
-                <Link2 size={14} />
-                {savingUrlAsset ? 'Attaching...' : 'Attach URL'}
-              </button>
-            </div>
+            {activeTab === 'assets' && (
+              <div className="space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <label className="text-sm font-bold text-text-primary block">
+                    <span className="inline-flex items-center gap-2">
+                      <ImagePlus size={15} />
+                      Upload File Asset
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*,video/*"
+                      onChange={(event) => setAssetFile(event.target.files?.[0] ?? null)}
+                      className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleUploadFile}
+                    disabled={!assetFile || isUploading}
+                    className="self-end inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-primary/30 text-primary font-bold hover:bg-primary/5 transition-colors disabled:opacity-60"
+                  >
+                    <ImagePlus size={15} />
+                    {isUploading ? 'Uploading...' : 'Upload Asset'}
+                  </button>
+                </div>
 
-            <div>
-              <h3 className="text-sm font-black text-text-primary mb-2 uppercase tracking-wide">Assets</h3>
-              {Array.isArray(post.assets) && post.assets.length > 0 ? (
-                <div className="space-y-2">
-                  {post.assets.map((asset, index) => {
-                    const assetUrl = getAssetUrl(asset);
+                <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_190px_170px] gap-3">
+                  <input
+                    value={assetUrl}
+                    onChange={(event) => setAssetUrl(event.target.value)}
+                    className="rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
+                    placeholder="https://example.com/asset.png"
+                  />
+                  <select
+                    value={assetUrlType}
+                    onChange={(event) => setAssetUrlType(event.target.value as AssetType)}
+                    className="rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
+                  >
+                    <option value="image">Image</option>
+                    <option value="video">Video</option>
+                    <option value="document">Document</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={handleAttachUrl}
+                    disabled={isAttaching || !assetUrl.trim()}
+                    className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-primary/30 text-primary font-bold hover:bg-primary/5 transition-colors disabled:opacity-60"
+                  >
+                    <Link2 size={15} />
+                    {isAttaching ? 'Attaching...' : 'Attach URL'}
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {(post.assets ?? []).map((asset, index) => {
+                    const url = getAssetUrl(asset);
+                    const type = String(asset.assetType ?? 'asset').toLowerCase();
                     return (
-                      <div
-                        key={`${asset.id ?? 'asset'}-${index}`}
-                        className="rounded-xl border border-text-secondary/10 p-2.5"
-                      >
-                        <p className="text-xs font-bold text-text-primary mb-1">
+                      <article key={`${asset.id ?? index}`} className="rounded-xl border border-text-secondary/10 p-3">
+                        <p className="text-xs font-bold uppercase tracking-wide text-text-secondary mb-2">
                           {asset.assetType ?? 'asset'}
                         </p>
-                        {assetUrl ? (
+                        {type.includes('image') && url && (
+                          <img src={url} alt="Asset preview" className="w-full h-44 object-cover rounded-lg border border-text-secondary/10" />
+                        )}
+                        {type.includes('video') && url && (
+                          <video controls className="w-full h-44 rounded-lg border border-text-secondary/10">
+                            <source src={url} />
+                          </video>
+                        )}
+                        {!type.includes('image') && !type.includes('video') && (
+                          <p className="text-xs text-text-secondary">Preview not available for this asset type.</p>
+                        )}
+                        {url && (
                           <a
-                            href={assetUrl}
+                            href={url}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-xs text-primary break-all"
+                            className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-primary"
                           >
-                            {assetUrl}
+                            <Eye size={12} />
+                            Open Asset
                           </a>
-                        ) : (
-                          <p className="text-xs text-text-secondary">No preview URL</p>
                         )}
-                      </div>
+                        <div className="mt-2 text-[11px] text-text-secondary space-y-1">
+                          <p>ID: {String(asset.id ?? '-')}</p>
+                          <p>Sort: {String(asset.sortOrder ?? 0)}</p>
+                        </div>
+                      </article>
                     );
                   })}
+                  {(post.assets ?? []).length === 0 && (
+                    <p className="text-sm text-text-secondary">No assets available for this post.</p>
+                  )}
                 </div>
-              ) : (
-                <p className="text-sm text-text-secondary">No assets attached yet.</p>
-              )}
+              </div>
+            )}
+          </div>
+
+          <aside className="bg-bg-primary rounded-[28px] border border-text-secondary/10 p-5 h-fit space-y-5">
+            <div>
+              <h2 className="text-sm font-black uppercase tracking-wide text-text-secondary mb-2">Quick Actions</h2>
+              <button
+                type="button"
+                onClick={handleQueue}
+                disabled={isQueueing}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-300 text-emerald-700 font-bold hover:bg-emerald-50 transition-colors disabled:opacity-60"
+              >
+                <Send size={15} />
+                {isQueueing ? 'Queueing...' : 'Queue Publish'}
+              </button>
+            </div>
+
+            <div className="pt-4 border-t border-text-secondary/10">
+              <h2 className="text-sm font-black uppercase tracking-wide text-text-secondary mb-2">Approval</h2>
+              <input
+                value={reviewReason}
+                onChange={(event) => setReviewReason(event.target.value)}
+                className="w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
+                placeholder="Approval or reject reason"
+              />
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={handleApprove}
+                  disabled={isApproving}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-emerald-300 text-emerald-700 text-xs font-bold hover:bg-emerald-50 transition-colors disabled:opacity-60"
+                >
+                  <ShieldCheck size={14} />
+                  {isApproving ? '...' : 'Approve'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleReject}
+                  disabled={isRejecting}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-red-300 text-red-700 text-xs font-bold hover:bg-red-50 transition-colors disabled:opacity-60"
+                >
+                  <ShieldX size={14} />
+                  {isRejecting ? '...' : 'Reject'}
+                </button>
+              </div>
             </div>
           </aside>
         </div>
       )}
     </section>
+  );
+}
+
+function TabButton({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+        active
+          ? 'bg-primary text-white'
+          : 'border border-text-secondary/20 text-text-secondary hover:text-text-primary hover:border-text-secondary/40'
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function DetailRow({ label, value, multiline = false }: { label: string; value: string; multiline?: boolean }) {
+  return (
+    <div className="rounded-xl border border-text-secondary/10 p-3">
+      <p className="text-xs font-bold uppercase tracking-wide text-text-secondary">{label}</p>
+      <p className={`text-sm font-semibold text-text-primary mt-1 ${multiline ? 'whitespace-pre-wrap' : ''}`}>{value}</p>
+    </div>
   );
 }

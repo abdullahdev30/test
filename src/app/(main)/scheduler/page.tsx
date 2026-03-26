@@ -46,7 +46,7 @@ export default function SchedulerPage() {
       const mode = (post.publishMode ?? '').toLowerCase();
       const status = (post.status ?? '').toLowerCase();
       const hasSchedule = typeof post.scheduledFor === 'string' && post.scheduledFor.length > 0;
-      return mode === 'scheduled' || mode === 'manualdraft' || status.includes('draft') || hasSchedule;
+      return mode === 'scheduled' || mode === 'manual' || mode === 'manualdraft' || status.includes('draft') || hasSchedule;
     });
   }, [posts]);
 
@@ -97,13 +97,13 @@ export default function SchedulerPage() {
             </div>
             <h2 className="text-2xl font-black text-text-primary mb-2">No Scheduled Draft Posts</h2>
             <p className="text-text-secondary font-medium mb-8 max-w-sm">
-              Create a post first, then schedule it from the Posts module.
+              Create a post first, then schedule it from the Automation module.
             </p>
             <Link
               href="/posts"
               className="px-6 py-3 bg-[#7C3AED] text-white rounded-xl font-bold hover:opacity-90 transition-opacity"
             >
-              Open Posts
+              Open Automation
             </Link>
           </div>
         ) : (

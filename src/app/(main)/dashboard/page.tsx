@@ -1,153 +1,213 @@
-"use client";
-import React from 'react';
-import { 
-  Plus, Sparkles, Clock, CheckCircle2, 
-  MessageSquare, Layout, Link2, Zap, 
-  PenTool, Palette, MoreHorizontal, RefreshCw 
-} from 'lucide-react';
+'use client';
+
+import Link from 'next/link';
+import { useMemo, type ReactNode } from 'react';
+import { BarChart3, CalendarClock, CheckCircle2, Clock3, FileText, Plus, ShieldAlert } from 'lucide-react';
+import { usePosts } from '@/hooks/usePosts';
+import type { PostItem } from '@/lib/api/posts';
+
+function normalize(value?: string | null): string {
+  return (value ?? '').toLowerCase();
+}
+
+function isPublished(post: PostItem): boolean {
+  const status = normalize(post.status);
+  return status.includes('published') || status.includes('success') || status.includes('complete');
+}
+
+function isPending(post: PostItem): boolean {
+  const approval = normalize(post.approvalStatus);
+  const status = normalize(post.status);
+  return approval === 'pending' || status.includes('pending') || status.includes('approval');
+}
+
+function isScheduled(post: PostItem): boolean {
+  const mode = normalize(post.publishMode);
+  return mode === 'scheduled' || !!post.scheduledFor;
+}
+
+function formatDateTime(value?: string | null): string {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+}
+
+function toHoursRemaining(value?: string | null): string {
+  if (!value) return '-';
+  const ts = Date.parse(value);
+  if (Number.isNaN(ts)) return '-';
+  const diffMs = ts - Date.now();
+  if (diffMs <= 0) return 'due now';
+  const hours = Math.ceil(diffMs / (1000 * 60 * 60));
+  return `${hours}h left`;
+}
 
 export default function DashboardPage() {
+  const { posts, pendingApprovalPosts, isLoading, error } = usePosts();
+
+  const allPosts = useMemo(() => {
+    const map = new Map<string, PostItem>();
+    for (const post of posts) map.set(post.id, post);
+    for (const post of pendingApprovalPosts) map.set(post.id, post);
+    return Array.from(map.values());
+  }, [pendingApprovalPosts, posts]);
+
+  const metrics = useMemo(() => {
+    const total = allPosts.length;
+    const published = allPosts.filter(isPublished).length;
+    const pending = allPosts.filter(isPending).length;
+    const scheduled = allPosts.filter(isScheduled).length;
+    const upcoming = allPosts
+      .filter((post) => !!post.scheduledFor)
+      .sort((a, b) => {
+        const aTime = Date.parse(a.scheduledFor ?? '') || Number.MAX_SAFE_INTEGER;
+        const bTime = Date.parse(b.scheduledFor ?? '') || Number.MAX_SAFE_INTEGER;
+        return aTime - bTime;
+      })
+      .slice(0, 3);
+
+    return { total, published, pending, scheduled, upcoming };
+  }, [allPosts]);
+
+  const statusChart = useMemo(() => {
+    const published = metrics.published;
+    const pending = metrics.pending;
+    const scheduled = metrics.scheduled;
+    const total = Math.max(metrics.total, 1);
+    return [
+      { label: 'Published', value: published, percent: Math.round((published / total) * 100), color: 'bg-emerald-500' },
+      { label: 'Pending Approval', value: pending, percent: Math.round((pending / total) * 100), color: 'bg-amber-500' },
+      { label: 'Scheduled', value: scheduled, percent: Math.round((scheduled / total) * 100), color: 'bg-blue-500' },
+    ];
+  }, [metrics]);
+
+  const sourceChart = useMemo(() => {
+    const sourceCounts = allPosts.reduce<Record<string, number>>((acc, post) => {
+      const key = post.sourceType || 'manual';
+      acc[key] = (acc[key] ?? 0) + 1;
+      return acc;
+    }, {});
+
+    const total = Math.max(allPosts.length, 1);
+    return Object.entries(sourceCounts)
+      .map(([label, value]) => ({
+        label,
+        value,
+        percent: Math.round((value / total) * 100),
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [allPosts]);
+
   return (
-    <div className="p-8 max-w-[1600px] mx-auto min-h-screen font-sans">
-      
-      {/* --- TOP HEADER SECTION --- */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-10 gap-6">
+    <div className="p-6 lg:p-10 max-w-[1450px] mx-auto min-h-screen">
+      <div className="mb-8 flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-black text-text-primary tracking-tight">Overview</h1>
-          <p className="text-text-secondary mt-2 font-medium">Welcome back, here's what's happening with your socials.</p>
+          <h1 className="text-4xl font-black text-text-primary tracking-tight">Automation Dashboard</h1>
+          <p className="text-text-secondary mt-2 font-medium">
+            Monitor automation volume, approvals, and next scheduled posts.
+          </p>
         </div>
-        <div className="flex items-center gap-4">
-          <button className="flex items-center gap-2 px-6 py-3.5 border-2 border-text-primary/10 bg-bg-primary rounded-2xl font-bold text-text-primary hover:bg-secondary transition-all text-sm shadow-sm">
-            <Plus size={20} /> Create Post
-          </button>
-          <button className="flex items-center gap-2 px-6 py-3.5 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/25 hover:scale-[1.02] transition-all text-sm">
-            <Sparkles size={20} /> Generate AI Content
-          </button>
+        <div className="flex flex-wrap gap-3">
+          <Link
+            href="/posts/new"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-white font-bold hover:opacity-90 transition-opacity"
+          >
+            <Plus size={16} />
+            Create New Post
+          </Link>
+          <Link
+            href="/posts"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-text-secondary/20 text-text-secondary hover:text-text-primary hover:border-text-secondary/40 transition-colors font-bold"
+          >
+            <BarChart3 size={16} />
+            Open Automation
+          </Link>
         </div>
       </div>
 
-      {/* --- 4-COLUMN STATS GRID --- */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
-        <StatBox icon={<Clock className="text-blue-500" />} label="Scheduled" value="24" trend="+12%" color="blue" />
-        <StatBox icon={<CheckCircle2 className="text-emerald-500" />} label="Published" value="142" trend="+4%" color="emerald" />
-        <StatBox icon={<MessageSquare className="text-orange-400" />} label="Pending Approval" value="5" trend="0%" color="orange" />
-        <StatBox icon={<Layout className="text-primary" />} label="Accounts" value="8" trend="-2%" color="purple" />
+      {(isLoading || error) && (
+        <div className="mb-6 rounded-2xl border border-text-secondary/10 bg-bg-primary px-4 py-3 text-sm font-medium">
+          {isLoading && <p className="text-text-secondary">Loading automation data...</p>}
+          {error && <p className="text-red-600">{error}</p>}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+        <MetricCard title="Total Posts" value={metrics.total} icon={<FileText size={17} />} />
+        <MetricCard title="Published" value={metrics.published} icon={<CheckCircle2 size={17} />} />
+        <MetricCard title="Pending Approval" value={metrics.pending} icon={<ShieldAlert size={17} />} />
+        <MetricCard title="Scheduled" value={metrics.scheduled} icon={<CalendarClock size={17} />} />
       </div>
 
-      {/* --- BOTTOM SECTION: 2/3 and 1/3 SPLIT --- */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
-        {/* Left Side: Upcoming Posts */}
-        <div className="lg:col-span-8">
-          <div className="bg-bg-primary border border-text-primary/10 rounded-[32px] p-8 shadow-sm h-full transition-colors duration-300">
-            <div className="flex justify-between items-center mb-8">
-              <h3 className="text-xl font-bold text-text-primary">Upcoming Posts</h3>
-              <button className="text-sm font-bold text-primary hover:opacity-70 transition-opacity">View Calendar</button>
-            </div>
-            <div className="space-y-4">
-              <PostItem platform="TWITTER" time="Today, 2:30 PM" title="10 AI tools that will change your marketing workflow" tagClass="bg-blue-500/10 text-blue-500" />
-              <PostItem platform="INSTAGRAM" time="Tomorrow, 10:00 AM" title="Behind the scenes: How we use SocialAI for growth" tagClass="bg-pink-500/10 text-pink-500" />
-              <PostItem platform="LINKEDIN" time="Nov 14, 09:15 AM" title="Why automation is the future of small business" tagClass="bg-indigo-500/10 text-indigo-500" />
-            </div>
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] gap-6">
+        <div className="bg-bg-primary rounded-[28px] border border-text-secondary/10 p-6">
+          <h2 className="text-xl font-black text-text-primary mb-4">Status Split</h2>
+          <div className="space-y-3">
+            {statusChart.map((item) => (
+              <div key={item.label}>
+                <div className="flex items-center justify-between text-sm mb-1">
+                  <p className="font-bold text-text-primary">{item.label}</p>
+                  <p className="text-text-secondary">{item.value} ({item.percent}%)</p>
+                </div>
+                <div className="h-2.5 bg-secondary rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full ${item.color}`} style={{ width: `${item.percent}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <h3 className="text-lg font-black text-text-primary mt-8 mb-4">Source Type Split</h3>
+          <div className="space-y-3">
+            {sourceChart.length === 0 && <p className="text-sm text-text-secondary">No source data available.</p>}
+            {sourceChart.map((item) => (
+              <div key={item.label} className="rounded-xl border border-text-secondary/10 p-3">
+                <p className="text-sm font-bold text-text-primary">{item.label}</p>
+                <p className="text-xs text-text-secondary mt-1">{item.value} posts ({item.percent}%)</p>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Right Side: Quick Actions & Activity */}
-        <div className="lg:col-span-4 space-y-8">
-          <div className="bg-bg-primary border border-text-primary/10 rounded-[32px] p-8 shadow-sm transition-colors duration-300">
-            <h3 className="text-xl font-bold text-text-primary mb-6">Quick Actions</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <QuickAction icon={<Link2 />} label="Connect Account" />
-              <QuickAction icon={<Zap />} label="Bulk Generate" />
-              <QuickAction icon={<PenTool />} label="Draft Post" />
-              <QuickAction icon={<Palette />} label="AI Designer" />
-            </div>
+        <div className="space-y-6">
+          <div className="bg-bg-primary rounded-[28px] border border-text-secondary/10 p-5">
+            <h2 className="text-lg font-black text-text-primary mb-4">Next 3 Upcoming Posts</h2>
+            {metrics.upcoming.length === 0 ? (
+              <p className="text-sm text-text-secondary">No upcoming posts found.</p>
+            ) : (
+              <div className="space-y-3">
+                {metrics.upcoming.map((post) => (
+                  <Link
+                    key={post.id}
+                    href={`/posts/${post.id}`}
+                    className="block rounded-xl border border-text-secondary/10 p-3 hover:border-text-secondary/30 transition-colors"
+                  >
+                    <p className="font-bold text-text-primary truncate">{post.title || 'Untitled post'}</p>
+                    <p className="text-xs text-text-secondary mt-1">{formatDateTime(post.scheduledFor)}</p>
+                    <p className="text-xs text-emerald-700 font-semibold mt-1 inline-flex items-center gap-1">
+                      <Clock3 size={12} />
+                      Reminder: {toHoursRemaining(post.scheduledFor)}
+                    </p>
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
 
-          <div className="bg-bg-primary border border-text-primary/10 rounded-[32px] p-8 shadow-sm transition-colors duration-300">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-text-primary">Activity Log</h3>
-              <button className="text-xs text-text-secondary font-bold hover:text-primary transition-colors">View all</button>
-            </div>
-            <div className="space-y-6 relative ml-2">
-              <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-text-primary/10"></div>
-              <LogItem icon={<CheckCircle2 size={14} />} color="emerald" title="Post published successfully" time="Twitter - 12 mins ago" />
-              <LogItem icon={<Sparkles size={14} />} color="purple" title="AI generated 4 drafts" time="System - 2 hours ago" />
-              <LogItem icon={<Link2 size={14} />} color="blue" title="Connected TikTok account" time="Nov 11, 4:50 PM" />
-            </div>
-          </div>
         </div>
       </div>
     </div>
   );
 }
 
-/* --- HELPER SUB-COMPONENTS --- */
-
-function StatBox({ icon, label, value, trend, color }: any) {
-  const bgs: any = { 
-    blue: "bg-blue-500/10", 
-    emerald: "bg-emerald-500/10", 
-    orange: "bg-orange-500/10", 
-    purple: "bg-primary/10" 
-  };
+function MetricCard({ title, value, icon }: { title: string; value: number; icon: ReactNode }) {
   return (
-    <div className="bg-bg-primary p-7 rounded-[32px] border border-text-primary/10 shadow-sm hover:shadow-md transition-all duration-300 group">
-      <div className="flex justify-between items-start mb-5">
-        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${bgs[color]} group-hover:scale-110 transition-transform`}>
-          {icon}
-        </div>
-        <span className="text-[11px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-lg tracking-tight">{trend}</span>
+    <article className="bg-bg-primary rounded-2xl border border-text-secondary/10 p-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xs font-bold uppercase tracking-wide text-text-secondary">{title}</h2>
+        <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">{icon}</div>
       </div>
-      <p className="text-xs font-bold text-text-secondary uppercase tracking-wider">{label}</p>
-      <h3 className="text-3xl font-black text-text-primary mt-1">{value}</h3>
-    </div>
-  );
-}
-
-function PostItem({ platform, time, title, tagClass }: any) {
-  return (
-    <div className="flex items-center gap-5 p-4 rounded-2xl border border-text-primary/10 hover:bg-secondary transition-all cursor-pointer group">
-      <div className="w-16 h-16 bg-secondary rounded-2xl overflow-hidden flex-shrink-0 border border-text-primary/10"></div>
-      <div className="flex-1">
-        <div className="flex items-center gap-3 mb-1">
-          <span className={`text-[9px] font-black px-2 py-0.5 rounded-md ${tagClass}`}>{platform}</span>
-          <span className="text-[10px] text-text-secondary font-bold uppercase tracking-wider">{time}</span>
-        </div>
-        <h4 className="text-[15px] font-bold text-text-primary group-hover:text-primary transition-colors">{title}</h4>
-      </div>
-      <div className="flex flex-col justify-between items-end h-16">
-        <MoreHorizontal className="text-text-secondary/50 group-hover:text-text-primary transition-colors" size={20} />
-        <RefreshCw className="text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" size={16} />
-      </div>
-    </div>
-  );
-}
-
-function QuickAction({ icon, label }: any) {
-  return (
-    <button className="flex flex-col items-center justify-center p-5 rounded-[24px] border border-text-primary/10 bg-bg-primary hover:border-primary/30 hover:bg-primary/5 transition-all group">
-      <div className="text-primary mb-3 group-hover:scale-110 transition-transform">{icon}</div>
-      <span className="text-[10px] font-bold text-text-primary leading-tight uppercase tracking-tight text-center">{label}</span>
-    </button>
-  );
-}
-
-function LogItem({ icon, color, title, time }: any) {
-  const colors: any = { 
-    emerald: "text-emerald-500 border-emerald-500/20 bg-emerald-500/10", 
-    purple: "text-primary border-primary/20 bg-primary/10", 
-    blue: "text-blue-500 border-blue-500/20 bg-blue-500/10" 
-  };
-  return (
-    <div className="flex gap-4 relative z-10">
-      <div className={`w-6 h-6 rounded-full border flex items-center justify-center shadow-sm ${colors[color]}`}>
-        {icon}
-      </div>
-      <div>
-        <h5 className="text-[13px] font-bold text-text-primary">{title}</h5>
-        <p className="text-[11px] text-text-secondary font-medium mt-0.5">{time}</p>
-      </div>
-    </div>
+      <p className="text-3xl font-black text-text-primary mt-2">{value}</p>
+    </article>
   );
 }

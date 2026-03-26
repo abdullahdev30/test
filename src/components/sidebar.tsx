@@ -13,7 +13,7 @@ const menuItems = [
   { name: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
   { name: 'Workspace', icon: Briefcase, href: '/workspace' },
   { name: 'Connections', icon: Link2, href: '/connections' },
-  { name: 'Posts', icon: FileText, href: '/posts' },
+  { name: 'Automation', icon: FileText, href: '/posts' },
   { name: 'Scheduler', icon: Calendar, href: '/scheduler' },
   { name: 'Settings', icon: Settings, href: '/settings' },
 ];

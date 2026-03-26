@@ -6,6 +6,7 @@ import {
   attachPostAssets,
   createAndQueueAutomationPost,
   createPost,
+  listPendingApprovalPosts,
   listPosts,
   queuePostPublish,
   rejectPost,
@@ -91,12 +92,14 @@ function mergeAsset(post: PostItem, asset: PostAsset | null): PostItem {
 
 export interface UsePostsReturn {
   posts: PostItem[];
+  pendingApprovalPosts: PostItem[];
   isLoading: boolean;
   isMutating: boolean;
   error: string | null;
   cacheSavedAt: string | null;
   getPostByIdFromStore: (id: string) => PostItem | null;
   refreshFromApi: () => Promise<void>;
+  refreshPendingApprovalFromApi: () => Promise<void>;
   createNewPost: (data: CreatePostInput) => Promise<{ success: boolean; error?: string; post?: PostItem | null }>;
   updateExistingPost: (id: string, data: UpdatePostInput) => Promise<{ success: boolean; error?: string; post?: PostItem | null }>;
   attachAssetsByUrl: (
@@ -124,6 +127,7 @@ export interface UsePostsReturn {
 export function usePosts(): UsePostsReturn {
   const [cacheBootstrap] = useState(() => readPostsCache());
   const [posts, setPosts] = useState<PostItem[]>(cacheBootstrap.posts);
+  const [pendingApprovalPosts, setPendingApprovalPosts] = useState<PostItem[]>([]);
   const [isLoading, setIsLoading] = useState(!cacheBootstrap.found);
   const [error, setError] = useState<string | null>(null);
   const [cacheSavedAt, setCacheSavedAt] = useState<string | null>(cacheBootstrap.savedAt);
@@ -151,10 +155,24 @@ export function usePosts(): UsePostsReturn {
     }
   }, [persistPosts]);
 
+  const refreshPendingApprovalFromApi = useCallback(async () => {
+    setError(null);
+    const result = await listPendingApprovalPosts();
+    if (!result.success) {
+      setError(result.error ?? 'Failed to fetch pending approval posts');
+      return;
+    }
+    setPendingApprovalPosts(sortPosts(result.posts));
+  }, []);
+
   useEffect(() => {
     if (cacheBootstrap.found) return;
     void refreshFromApi();
   }, [cacheBootstrap.found, refreshFromApi]);
+
+  useEffect(() => {
+    void refreshPendingApprovalFromApi();
+  }, [refreshPendingApprovalFromApi]);
 
   const getPostByIdFromStore = useCallback(
     (id: string): PostItem | null => posts.find((post) => post.id === id) ?? null,
@@ -377,6 +395,7 @@ export function usePosts(): UsePostsReturn {
           }
 
           patchPostLocally(id, { status: 'approved' });
+          setPendingApprovalPosts((prev) => prev.filter((post) => post.id !== id));
           resolve({ success: true });
         });
       }),
@@ -395,6 +414,7 @@ export function usePosts(): UsePostsReturn {
           }
 
           patchPostLocally(id, { status: 'rejected' });
+          setPendingApprovalPosts((prev) => prev.filter((post) => post.id !== id));
           resolve({ success: true });
         });
       }),
@@ -426,12 +446,14 @@ export function usePosts(): UsePostsReturn {
   return useMemo(
     () => ({
       posts,
+      pendingApprovalPosts,
       isLoading,
       isMutating,
       error,
       cacheSavedAt,
       getPostByIdFromStore,
       refreshFromApi,
+      refreshPendingApprovalFromApi,
       createNewPost,
       updateExistingPost,
       attachAssetsByUrl,
@@ -446,12 +468,14 @@ export function usePosts(): UsePostsReturn {
     }),
     [
       posts,
+      pendingApprovalPosts,
       isLoading,
       isMutating,
       error,
       cacheSavedAt,
       getPostByIdFromStore,
       refreshFromApi,
+      refreshPendingApprovalFromApi,
       createNewPost,
       updateExistingPost,
       attachAssetsByUrl,

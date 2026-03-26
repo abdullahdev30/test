@@ -50,6 +50,32 @@ export const useAuth = (): AuthState => {
     fetchSession();
   }, []);
 
+  const waitForSessionCookie = useCallback(async (attempts = 12, delayMs = 150) => {
+    for (let i = 0; i < attempts; i += 1) {
+      try {
+        const res = await fetch('/api/auth/session', {
+          method: 'GET',
+          credentials: 'same-origin',
+          cache: 'no-store',
+          headers: { Accept: 'application/json' },
+        });
+
+        if (res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { user?: unknown };
+          if (data.user) return true;
+        }
+      } catch {
+        // Keep retrying until attempts are exhausted.
+      }
+
+      if (i < attempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+
+    return false;
+  }, []);
+
   const login = useCallback(
     async (email: string, password: string) => {
       setIsLoading(true);
@@ -62,8 +88,21 @@ export const useAuth = (): AuthState => {
             setIsLoading(false);
             return;
           }
+
+          const sessionReady = await waitForSessionCookie();
+          if (!sessionReady) {
+            setError('Login succeeded, but session is still syncing. Please try again.');
+            setIsLoading(false);
+            return;
+          }
+
           // Re-fetch session to populate user state
-          const res = await fetch('/api/auth/session', { credentials: 'same-origin' });
+          const res = await fetch('/api/auth/session', {
+            method: 'GET',
+            credentials: 'same-origin',
+            cache: 'no-store',
+            headers: { Accept: 'application/json' },
+          });
           if (res.ok) {
             const data = await res.json();
             setUser(data.user || null);
@@ -77,7 +116,7 @@ export const useAuth = (): AuthState => {
         }
       });
     },
-    [router, startTransition],
+    [router, startTransition, waitForSessionCookie],
   );
 
   const logout = useCallback(async () => {

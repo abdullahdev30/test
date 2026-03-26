@@ -139,8 +139,10 @@ export type CompleteOnboardingInput = z.infer<typeof CompleteOnboardingSchema>;
 export const CreatePostSchema = z.object({
   title: z.string().min(1, 'Title is required').max(180),
   captionText: z.string().max(5000).optional().or(z.literal('')),
-  publishMode: z.enum(['manualDraft', 'scheduled']).default('manualDraft'),
+  publishMode: z.enum(['manual', 'manualDraft', 'scheduled']).default('manual'),
+  sourceType: z.string().min(1).default('manual'),
   sourceTimezone: z.string().min(1, 'Timezone is required').default('UTC'),
+  approvalRequired: z.boolean().optional(),
   scheduledFor: z.string().datetime().optional().or(z.null()),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });

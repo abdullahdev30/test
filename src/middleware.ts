@@ -14,6 +14,16 @@ const PROTECTED_PREFIXES = [
 // Routes that authenticated users should not access
 const AUTH_ROUTES = ['/login', '/register', '/forgot-password'];
 
+const COOKIE_OPTS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax' as const,
+  path: '/',
+};
+
+const ACCESS_MAX_AGE = 60 * 60 * 24; // 24h
+const REFRESH_MAX_AGE = 60 * 60 * 24 * 7; // 7d
+
 // Security headers applied to ALL responses
 const SECURITY_HEADERS: Record<string, string> = {
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
@@ -40,8 +50,51 @@ function applySecurityHeaders(response: NextResponse): NextResponse {
   return response;
 }
 
+function sanitizeInternalPath(value: string | null, fallback: string): string {
+  if (!value) return fallback;
+  if (!value.startsWith('/')) return fallback;
+  if (value.startsWith('//')) return fallback;
+  return value;
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const searchParams = request.nextUrl.searchParams;
+
+  // OAuth handoff support: some providers redirect back with tokens in query params.
+  // Capture them once, write httpOnly cookies, and continue to the intended route.
+  const oauthAccessToken =
+    searchParams.get('access_token') ??
+    searchParams.get('accessToken') ??
+    searchParams.get('token');
+  const oauthRefreshToken =
+    searchParams.get('refresh_token') ?? searchParams.get('refreshToken');
+
+  if (oauthAccessToken) {
+    const cleanUrl = request.nextUrl.clone();
+    cleanUrl.searchParams.delete('access_token');
+    cleanUrl.searchParams.delete('accessToken');
+    cleanUrl.searchParams.delete('token');
+    cleanUrl.searchParams.delete('refresh_token');
+    cleanUrl.searchParams.delete('refreshToken');
+
+    const callbackUrl = sanitizeInternalPath(cleanUrl.searchParams.get('callbackUrl'), '/dashboard');
+    const redirectTarget =
+      AUTH_ROUTES.some((r) => pathname === r) ? new URL(callbackUrl, request.url) : cleanUrl;
+
+    const response = NextResponse.redirect(redirectTarget);
+    response.cookies.set('access_token', oauthAccessToken, {
+      ...COOKIE_OPTS,
+      maxAge: ACCESS_MAX_AGE,
+    });
+    if (oauthRefreshToken) {
+      response.cookies.set('refresh_token', oauthRefreshToken, {
+        ...COOKIE_OPTS,
+        maxAge: REFRESH_MAX_AGE,
+      });
+    }
+    return applySecurityHeaders(response);
+  }
 
   // Read auth cookies. For protected routes/APIs, allow either access or refresh cookie.
   // This prevents unnecessary redirects when access token is missing but refresh token exists.

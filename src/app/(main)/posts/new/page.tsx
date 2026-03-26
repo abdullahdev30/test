@@ -3,11 +3,20 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, CalendarDays, Clock3, ImagePlus, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { usePosts } from '@/hooks/usePosts';
 import type { CreatePostInput } from '@/lib/schemas';
 
-type PublishMode = 'manualDraft' | 'scheduled';
+type PublishMode = 'manual' | 'scheduled';
+type AssetType = 'image' | 'video' | 'document';
+type Provider = 'linkedin' | 'facebook' | 'instagram' | 'google_business_profile';
+
+const PLATFORM_OPTIONS: Array<{ label: string; value: Provider }> = [
+  { label: 'LinkedIn', value: 'linkedin' },
+  { label: 'Facebook', value: 'facebook' },
+  { label: 'Instagram', value: 'instagram' },
+  { label: 'Google Business Profile', value: 'google_business_profile' },
+];
 
 function combineDateAndTime(dateValue: string, timeValue: string): string | null {
   if (!dateValue || !timeValue) return null;
@@ -15,33 +24,51 @@ function combineDateAndTime(dateValue: string, timeValue: string): string | null
   return Number.isNaN(Date.parse(iso)) ? null : iso;
 }
 
-function inferAssetType(file: File): 'image' | 'video' | 'document' {
+function inferAssetType(file: File): AssetType {
   if (file.type.startsWith('image/')) return 'image';
   if (file.type.startsWith('video/')) return 'video';
   return 'document';
 }
 
-export default function NewPostPage() {
+export default function CreateAutomationPostPage() {
   const router = useRouter();
-  const { createNewPost, uploadAssetFile, clearError } = usePosts();
+  const { createNewPost, setTargetsForPost, uploadAssetFile, queuePublish, clearError } = usePosts();
 
-  const [title, setTitle] = useState('');
-  const [captionText, setCaptionText] = useState('');
-  const [publishMode, setPublishMode] = useState<PublishMode>('manualDraft');
+  const [title, setTitle] = useState('April Campaign Launch');
+  const [captionText, setCaptionText] = useState('Launching our April campaign with fresh offers.');
+  const [publishMode, setPublishMode] = useState<PublishMode>('manual');
   const [dateValue, setDateValue] = useState('');
   const [timeValue, setTimeValue] = useState('');
-  const [sourceTimezone, setSourceTimezone] = useState('UTC');
+  const [sourceTimezone, setSourceTimezone] = useState('Asia/Karachi');
+  const [approvalRequired, setApprovalRequired] = useState(true);
+  const [automated, setAutomated] = useState(false);
+  const [campaignMeta, setCampaignMeta] = useState('april-2026');
+  const [selectedProviders, setSelectedProviders] = useState<Record<Provider, boolean>>({
+    linkedin: false,
+    facebook: false,
+    instagram: false,
+    google_business_profile: false,
+  });
   const [assetFile, setAssetFile] = useState<File | null>(null);
+  const [queueAfterCreate, setQueueAfterCreate] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  const activeProviders = useMemo(
+    () => PLATFORM_OPTIONS.filter((platform) => selectedProviders[platform.value]).map((platform) => platform.value),
+    [selectedProviders],
+  );
+
+  function toggleProvider(provider: Provider) {
+    setSelectedProviders((prev) => ({ ...prev, [provider]: !prev[provider] }));
+  }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError(null);
     clearError();
 
-    const cleanTitle = title.trim();
-    if (!cleanTitle) {
+    if (!title.trim()) {
       setFormError('Post title is required.');
       return;
     }
@@ -51,23 +78,46 @@ export default function NewPostPage() {
       : null;
 
     if (publishMode === 'scheduled' && !scheduledFor) {
-      setFormError('Please set both date and time for scheduled post.');
+      setFormError('Please set both date and time for scheduled publish mode.');
       return;
     }
 
-    const payload: CreatePostInput = {
-      title: cleanTitle,
+    if (activeProviders.length === 0) {
+      setFormError('Please select at least one platform.');
+      return;
+    }
+
+    const postPayload: CreatePostInput = {
+      title: title.trim(),
       captionText: captionText.trim(),
       publishMode,
-      sourceTimezone: sourceTimezone.trim() || 'UTC',
+      sourceType: automated ? 'automated' : 'manual',
+      sourceTimezone: sourceTimezone.trim() || 'Asia/Karachi',
+      approvalRequired,
       scheduledFor: scheduledFor ?? undefined,
+      metadata: {
+        campaign: campaignMeta.trim() || undefined,
+        automated,
+      },
     };
 
     setIsSubmitting(true);
     try {
-      const created = await createNewPost(payload);
+      const created = await createNewPost(postPayload);
       if (!created.success || !created.post?.id) {
         setFormError(created.error ?? 'Failed to create post.');
+        return;
+      }
+
+      const targetResult = await setTargetsForPost(created.post.id, {
+        targets: activeProviders.map((provider) => ({
+          provider,
+          scheduledFor: scheduledFor ?? undefined,
+        })),
+      });
+
+      if (!targetResult.success) {
+        setFormError(targetResult.error ?? 'Post created, but platform targets failed.');
         return;
       }
 
@@ -78,7 +128,15 @@ export default function NewPostPage() {
         });
 
         if (!upload.success) {
-          setFormError(upload.error ?? 'Post created but asset upload failed.');
+          setFormError(upload.error ?? 'Post created, but asset upload failed.');
+          return;
+        }
+      }
+
+      if (queueAfterCreate) {
+        const queued = await queuePublish(created.post.id);
+        if (!queued.success) {
+          setFormError(queued.error ?? 'Post created, but queue publish failed.');
           return;
         }
       }
@@ -90,12 +148,12 @@ export default function NewPostPage() {
   }
 
   return (
-    <section className="p-6 lg:p-10 max-w-4xl mx-auto min-h-screen">
-      <div className="mb-8 flex items-center justify-between gap-4">
+    <section className="p-6 lg:p-10 max-w-5xl mx-auto min-h-screen">
+      <div className="mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-black text-text-primary tracking-tight">Create New Post</h1>
+          <h1 className="text-4xl font-black text-text-primary tracking-tight">Create Automation Post</h1>
           <p className="text-text-secondary mt-2 font-medium">
-            Create a post and optionally attach image/video asset.
+            Select platforms with checkboxes, set time/timezone, and create the post.
           </p>
         </div>
         <Link
@@ -103,7 +161,7 @@ export default function NewPostPage() {
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-text-secondary/20 text-text-secondary hover:text-text-primary hover:border-text-secondary/40 transition-colors font-bold"
         >
           <ArrowLeft size={16} />
-          Back to Posts
+          Back to Automation
         </Link>
       </div>
 
@@ -114,47 +172,52 @@ export default function NewPostPage() {
       )}
 
       <div className="bg-bg-primary rounded-[28px] border border-text-secondary/10 p-6 md:p-8">
-        <form className="space-y-5" onSubmit={handleSubmit}>
-          <label className="text-sm font-bold text-text-primary block">
-            Post Title
-            <input
-              className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              placeholder="Launch Campaign Post"
-            />
-          </label>
-
-          <label className="text-sm font-bold text-text-primary block">
-            Caption
-            <textarea
-              className="mt-1.5 w-full min-h-[130px] rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40"
-              value={captionText}
-              onChange={(event) => setCaptionText(event.target.value)}
-              placeholder="Write your post caption..."
-            />
-          </label>
-
+        <form className="space-y-6" onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label className="text-sm font-bold text-text-primary block">
+              Title
+              <input
+                className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+              />
+            </label>
+            <label className="text-sm font-bold text-text-primary block">
+              Caption
+              <input
+                className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                value={captionText}
+                onChange={(event) => setCaptionText(event.target.value)}
+              />
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <label className="text-sm font-bold text-text-primary block">
               Publish Mode
               <select
-                className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
                 value={publishMode}
                 onChange={(event) => setPublishMode(event.target.value as PublishMode)}
               >
-                <option value="manualDraft">Manual Draft</option>
+                <option value="manual">Manual</option>
                 <option value="scheduled">Scheduled</option>
               </select>
             </label>
-
             <label className="text-sm font-bold text-text-primary block">
               Source Timezone
               <input
-                className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
                 value={sourceTimezone}
                 onChange={(event) => setSourceTimezone(event.target.value)}
-                placeholder="UTC"
+              />
+            </label>
+            <label className="text-sm font-bold text-text-primary block">
+              Metadata Campaign
+              <input
+                className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
+                value={campaignMeta}
+                onChange={(event) => setCampaignMeta(event.target.value)}
               />
             </label>
           </div>
@@ -168,7 +231,7 @@ export default function NewPostPage() {
                 </span>
                 <input
                   type="date"
-                  className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                  className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
                   value={dateValue}
                   onChange={(event) => setDateValue(event.target.value)}
                 />
@@ -180,7 +243,7 @@ export default function NewPostPage() {
                 </span>
                 <input
                   type="time"
-                  className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                  className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
                   value={timeValue}
                   onChange={(event) => setTimeValue(event.target.value)}
                 />
@@ -188,10 +251,26 @@ export default function NewPostPage() {
             </div>
           )}
 
+          <div className="rounded-2xl border border-text-secondary/10 p-4">
+            <h2 className="text-sm font-black text-text-primary uppercase tracking-wide mb-3">Platforms</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {PLATFORM_OPTIONS.map((platform) => (
+                <label key={platform.value} className="inline-flex items-center gap-2 text-sm font-bold text-text-primary">
+                  <input
+                    type="checkbox"
+                    checked={selectedProviders[platform.value]}
+                    onChange={() => toggleProvider(platform.value)}
+                  />
+                  {platform.label}
+                </label>
+              ))}
+            </div>
+          </div>
+
           <label className="text-sm font-bold text-text-primary block">
             <span className="inline-flex items-center gap-2">
               <ImagePlus size={15} />
-              Attach Image/Video
+              Upload Asset (Image or Video)
             </span>
             <input
               type="file"
@@ -201,13 +280,40 @@ export default function NewPostPage() {
             />
           </label>
 
+          <div className="flex flex-wrap items-center gap-6 text-sm font-bold text-text-primary">
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={approvalRequired}
+                onChange={(event) => setApprovalRequired(event.target.checked)}
+              />
+              Approval Required
+            </label>
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={automated}
+                onChange={(event) => setAutomated(event.target.checked)}
+              />
+              Automated Post
+            </label>
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={queueAfterCreate}
+                onChange={(event) => setQueueAfterCreate(event.target.checked)}
+              />
+              Queue Publish After Create
+            </label>
+          </div>
+
           <button
             type="submit"
             disabled={isSubmitting}
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-white font-bold hover:opacity-90 transition-opacity disabled:opacity-60"
           >
             <Plus size={16} />
-            {isSubmitting ? 'Creating...' : 'Create Post'}
+            {isSubmitting ? 'Creating...' : 'Create Automation Post'}
           </button>
         </form>
       </div>

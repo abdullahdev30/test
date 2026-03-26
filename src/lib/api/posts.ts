@@ -42,7 +42,7 @@ export interface UploadPostAssetInput {
 export interface SetPostTargetsInput {
   targets: Array<{
     provider: string;
-    socialConnectionId: string;
+    socialConnectionId?: string;
     providerTargetId?: string;
     providerTargetName?: string;
     scheduledFor?: string | null;
@@ -52,7 +52,8 @@ export interface SetPostTargetsInput {
 export interface AutomationCreateAndQueueInput {
   title: string;
   captionText: string;
-  publishMode: 'manualDraft' | 'scheduled';
+  publishMode: 'manual' | 'scheduled';
+  sourceType?: string;
   sourceTimezone: string;
   scheduledFor?: string | null;
   approvalRequired?: boolean;
@@ -83,11 +84,20 @@ export interface PublishJob {
 
 export interface PostItem {
   id: string;
+  workspaceId?: string;
+  createdByUserId?: string;
+  updatedByUserId?: string;
+  approvedByUserId?: string;
   title?: string;
   captionText?: string;
+  approvalStatus?: string;
+  approvalRequired?: boolean;
   publishMode?: string;
+  sourceType?: string;
   status?: string;
   scheduledFor?: string | null;
+  approvedAt?: string | null;
+  lastError?: string | null;
   sourceTimezone?: string;
   metadata?: Record<string, unknown>;
   assets?: PostAsset[];
@@ -114,12 +124,31 @@ function normalizePost(value: unknown): PostItem | null {
     id,
     title: typeof raw.title === 'string' ? raw.title : '',
     captionText: typeof raw.captionText === 'string' ? raw.captionText : '',
+    workspaceId: typeof raw.workspaceId === 'string' ? raw.workspaceId : undefined,
+    createdByUserId: typeof raw.createdByUserId === 'string' ? raw.createdByUserId : undefined,
+    updatedByUserId: typeof raw.updatedByUserId === 'string' ? raw.updatedByUserId : undefined,
+    approvedByUserId: typeof raw.approvedByUserId === 'string' ? raw.approvedByUserId : undefined,
+    approvalStatus: typeof raw.approvalStatus === 'string' ? raw.approvalStatus : undefined,
+    approvalRequired: typeof raw.approvalRequired === 'boolean' ? raw.approvalRequired : undefined,
     publishMode: typeof raw.publishMode === 'string' ? raw.publishMode : undefined,
+    sourceType: typeof raw.sourceType === 'string' ? raw.sourceType : undefined,
     status: typeof raw.status === 'string' ? raw.status : undefined,
     scheduledFor:
       typeof raw.scheduledFor === 'string'
         ? raw.scheduledFor
         : raw.scheduledFor === null
+          ? null
+          : undefined,
+    approvedAt:
+      typeof raw.approvedAt === 'string'
+        ? raw.approvedAt
+        : raw.approvedAt === null
+          ? null
+          : undefined,
+    lastError:
+      typeof raw.lastError === 'string'
+        ? raw.lastError
+        : raw.lastError === null
           ? null
           : undefined,
     sourceTimezone: typeof raw.sourceTimezone === 'string' ? raw.sourceTimezone : undefined,
@@ -159,8 +188,15 @@ function extractPost(payload: unknown): PostItem | null {
   const raw = toRecord(payload);
   if (!raw) return normalizePost(payload);
 
-  const candidate = raw.post ?? raw.data ?? payload;
-  return normalizePost(candidate);
+  const candidate = normalizePost(raw.post ?? raw.data ?? payload);
+  if (!candidate) return null;
+
+  return {
+    ...candidate,
+    assets: Array.isArray(raw.assets) ? (raw.assets as PostAsset[]) : candidate.assets,
+    targets: Array.isArray(raw.targets) ? (raw.targets as PostTarget[]) : candidate.targets,
+    publishJobs: Array.isArray(raw.publishJobs) ? (raw.publishJobs as PublishJob[]) : candidate.publishJobs,
+  };
 }
 
 async function getAccessToken(): Promise<string | undefined> {

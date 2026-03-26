@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { signup, verifyEmail, resendVerification } from '@/lib/api/auth';
 
-const GOOGLE_AUTH_URL = "/api/auth/google";
+const GOOGLE_OAUTH_START_URL = "/api/auth/google";
 const FALLBACK_TIMEZONES = [
   'UTC',
   'Asia/Karachi',
@@ -123,6 +123,11 @@ const SignupFlow = () => {
     });
   };
 
+  const handleGoogleLogin = () => {
+    setError(null);
+    window.location.href = `${GOOGLE_OAUTH_START_URL}?next=${encodeURIComponent('/dashboard')}`;
+  };
+
   return (
     <section className="min-h-screen flex items-center justify-center bg-background p-4 text-txt-primary">
       <div className="w-full max-w-md bg-bg-primary rounded-3xl shadow-sm border border-background p-8 md:p-10 z-10">
@@ -231,7 +236,7 @@ const SignupFlow = () => {
 
             <button
               type="button"
-              onClick={() => window.location.href = GOOGLE_AUTH_URL}
+              onClick={handleGoogleLogin}
               className="w-full flex items-center justify-center gap-3 py-3 px-4 border rounded-xl font-medium text-txt-primary hover:bg-background"
             >
               <FcGoogle className="w-6 h-6" />
