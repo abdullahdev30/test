@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import {
   approvePost,
   attachPostAssets,
@@ -90,6 +90,32 @@ function mergeAsset(post: PostItem, asset: PostAsset | null): PostItem {
   };
 }
 
+function postFingerprint(post: PostItem): string {
+  return [
+    post.id,
+    post.updatedAt ?? '',
+    post.createdAt ?? '',
+    post.status ?? '',
+    post.approvalStatus ?? '',
+    post.publishMode ?? '',
+    post.scheduledFor ?? '',
+    post.lastError ?? '',
+    Array.isArray(post.assets) ? String(post.assets.length) : '0',
+  ].join('|');
+}
+
+function arePostCollectionsEqual(a: PostItem[], b: PostItem[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let index = 0; index < a.length; index += 1) {
+    if (postFingerprint(a[index]) !== postFingerprint(b[index])) return false;
+  }
+  return true;
+}
+
+interface RefreshOptions {
+  silent?: boolean;
+}
+
 export interface UsePostsReturn {
   posts: PostItem[];
   pendingApprovalPosts: PostItem[];
@@ -98,8 +124,8 @@ export interface UsePostsReturn {
   error: string | null;
   cacheSavedAt: string | null;
   getPostByIdFromStore: (id: string) => PostItem | null;
-  refreshFromApi: () => Promise<void>;
-  refreshPendingApprovalFromApi: () => Promise<void>;
+  refreshFromApi: (options?: RefreshOptions) => Promise<void>;
+  refreshPendingApprovalFromApi: (options?: RefreshOptions) => Promise<void>;
   createNewPost: (data: CreatePostInput) => Promise<{ success: boolean; error?: string; post?: PostItem | null }>;
   updateExistingPost: (id: string, data: UpdatePostInput) => Promise<{ success: boolean; error?: string; post?: PostItem | null }>;
   attachAssetsByUrl: (
@@ -132,17 +158,34 @@ export function usePosts(): UsePostsReturn {
   const [error, setError] = useState<string | null>(null);
   const [cacheSavedAt, setCacheSavedAt] = useState<string | null>(cacheBootstrap.savedAt);
   const [isMutating, startTransition] = useTransition();
+  const postsRef = useRef<PostItem[]>(cacheBootstrap.posts);
+  const pendingPostsRef = useRef<PostItem[]>([]);
+
+  useEffect(() => {
+    postsRef.current = posts;
+  }, [posts]);
+
+  useEffect(() => {
+    pendingPostsRef.current = pendingApprovalPosts;
+  }, [pendingApprovalPosts]);
 
   const persistPosts = useCallback((nextPosts: PostItem[]) => {
     const sorted = sortPosts(nextPosts);
+    if (arePostCollectionsEqual(postsRef.current, sorted)) {
+      return false;
+    }
     setPosts(sorted);
+    postsRef.current = sorted;
     const savedAt = writePostsCache(sorted);
     if (savedAt) setCacheSavedAt(savedAt);
+    return true;
   }, []);
 
-  const refreshFromApi = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+  const refreshFromApi = useCallback(async (options?: RefreshOptions) => {
+    if (!options?.silent) {
+      setIsLoading(true);
+      setError(null);
+    }
     try {
       const result = await listPosts();
       if (!result.success) {
@@ -151,18 +194,25 @@ export function usePosts(): UsePostsReturn {
       }
       persistPosts(result.posts);
     } finally {
-      setIsLoading(false);
+      if (!options?.silent) {
+        setIsLoading(false);
+      }
     }
   }, [persistPosts]);
 
-  const refreshPendingApprovalFromApi = useCallback(async () => {
-    setError(null);
+  const refreshPendingApprovalFromApi = useCallback(async (options?: RefreshOptions) => {
+    if (!options?.silent) {
+      setError(null);
+    }
     const result = await listPendingApprovalPosts();
     if (!result.success) {
       setError(result.error ?? 'Failed to fetch pending approval posts');
       return;
     }
-    setPendingApprovalPosts(sortPosts(result.posts));
+    const sorted = sortPosts(result.posts);
+    if (arePostCollectionsEqual(pendingPostsRef.current, sorted)) return;
+    pendingPostsRef.current = sorted;
+    setPendingApprovalPosts(sorted);
   }, []);
 
   useEffect(() => {
@@ -394,8 +444,12 @@ export function usePosts(): UsePostsReturn {
             return;
           }
 
-          patchPostLocally(id, { status: 'approved' });
-          setPendingApprovalPosts((prev) => prev.filter((post) => post.id !== id));
+          patchPostLocally(id, { status: 'approved', approvalStatus: 'approved' });
+          setPendingApprovalPosts((prev) => {
+            const next = prev.filter((post) => post.id !== id);
+            pendingPostsRef.current = next;
+            return next;
+          });
           resolve({ success: true });
         });
       }),
@@ -413,8 +467,12 @@ export function usePosts(): UsePostsReturn {
             return;
           }
 
-          patchPostLocally(id, { status: 'rejected' });
-          setPendingApprovalPosts((prev) => prev.filter((post) => post.id !== id));
+          patchPostLocally(id, { status: 'rejected', approvalStatus: 'rejected' });
+          setPendingApprovalPosts((prev) => {
+            const next = prev.filter((post) => post.id !== id);
+            pendingPostsRef.current = next;
+            return next;
+          });
           resolve({ success: true });
         });
       }),

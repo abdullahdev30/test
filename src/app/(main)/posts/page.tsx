@@ -2,17 +2,18 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { Eye, FileText, Plus, RefreshCw, Send } from 'lucide-react';
+import { Eye, FileText, Flag, Plus, RefreshCw, Send } from 'lucide-react';
 import { usePosts } from '@/hooks/usePosts';
 import type { PostItem } from '@/lib/api/posts';
 
-type FilterKey = 'all' | 'published' | 'pending' | 'scheduled';
+type FilterKey = 'all' | 'draft' | 'published' | 'pending' | 'scheduled';
 
 const PAGE_SIZE = 10;
 const LIVE_REFRESH_MS = 15000;
 
 const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: 'all', label: 'All Posts' },
+  { key: 'draft', label: 'Draft' },
   { key: 'published', label: 'Published' },
   { key: 'pending', label: 'Pending Approval' },
   { key: 'scheduled', label: 'Scheduled' },
@@ -43,6 +44,20 @@ function isScheduled(post: PostItem): boolean {
   return mode === 'scheduled' || !!post.scheduledFor;
 }
 
+function isDraft(post: PostItem): boolean {
+  const status = normalizeText(post.status);
+  const mode = normalizeText(post.publishMode);
+  if (status.includes('draft')) return true;
+  if (isPublished(post)) return false;
+  if (hasError(post)) return false;
+  return mode === 'manual' || mode === 'manualdraft';
+}
+
+function hasError(post: PostItem): boolean {
+  const status = normalizeText(post.status);
+  return !!post.lastError || status.includes('error') || status.includes('fail');
+}
+
 function getPreview(post: PostItem): string | null {
   const assets = Array.isArray(post.assets) ? post.assets : [];
   const first = assets.find((asset) => typeof asset.previewUrl === 'string' || typeof asset.url === 'string');
@@ -66,6 +81,7 @@ export default function AutomationPage() {
     refreshFromApi,
     refreshPendingApprovalFromApi,
     runDueJobs,
+    queuePublish,
     approveExistingPost,
     rejectExistingPost,
   } = usePosts();
@@ -77,9 +93,10 @@ export default function AutomationPage() {
   const [busyPostId, setBusyPostId] = useState<string | null>(null);
 
   useEffect(() => {
-    void Promise.all([refreshFromApi(), refreshPendingApprovalFromApi()]);
+    void Promise.all([refreshFromApi({ silent: true }), refreshPendingApprovalFromApi({ silent: true })]);
     const id = setInterval(() => {
-      void Promise.all([refreshFromApi(), refreshPendingApprovalFromApi()]);
+      if (document.visibilityState !== 'visible') return;
+      void Promise.all([refreshFromApi({ silent: true }), refreshPendingApprovalFromApi({ silent: true })]);
     }, LIVE_REFRESH_MS);
     return () => clearInterval(id);
   }, [refreshFromApi, refreshPendingApprovalFromApi]);
@@ -97,6 +114,8 @@ export default function AutomationPage() {
 
   const filteredPosts = useMemo(() => {
     switch (filter) {
+      case 'draft':
+        return allPosts.filter(isDraft);
       case 'published':
         return allPosts.filter(isPublished);
       case 'pending':
@@ -115,13 +134,31 @@ export default function AutomationPage() {
     setNotice(null);
     setIsRunningDue(true);
     try {
+      const draftPosts = allPosts.filter(isDraft);
+      let queuedCount = 0;
+      let queueFailures = 0;
+
+      for (const post of draftPosts) {
+        const queued = await queuePublish(post.id);
+        if (queued.success) {
+          queuedCount += 1;
+        } else {
+          queueFailures += 1;
+        }
+      }
+
       const result = await runDueJobs();
       if (!result.success) {
         setNotice(result.error ?? 'Failed to run due publish jobs.');
         return;
       }
-      setNotice('Publish queue run started.');
-      await Promise.all([refreshFromApi(), refreshPendingApprovalFromApi()]);
+
+      if (queueFailures > 0) {
+        setNotice(`Queued ${queuedCount} draft posts. ${queueFailures} failed to queue. Publish jobs processed.`);
+      } else {
+        setNotice(`Queued ${queuedCount} draft posts and processed publish jobs.`);
+      }
+      await Promise.all([refreshFromApi({ silent: true }), refreshPendingApprovalFromApi({ silent: true })]);
     } finally {
       setIsRunningDue(false);
     }
@@ -137,7 +174,7 @@ export default function AutomationPage() {
         return;
       }
       setNotice('Post approved.');
-      await Promise.all([refreshFromApi(), refreshPendingApprovalFromApi()]);
+      await Promise.all([refreshFromApi({ silent: true }), refreshPendingApprovalFromApi({ silent: true })]);
     } finally {
       setBusyPostId(null);
     }
@@ -153,7 +190,7 @@ export default function AutomationPage() {
         return;
       }
       setNotice('Post rejected.');
-      await Promise.all([refreshFromApi(), refreshPendingApprovalFromApi()]);
+      await Promise.all([refreshFromApi({ silent: true }), refreshPendingApprovalFromApi({ silent: true })]);
     } finally {
       setBusyPostId(null);
     }
@@ -187,7 +224,7 @@ export default function AutomationPage() {
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-300 text-emerald-700 hover:bg-emerald-50 transition-colors font-bold text-sm disabled:opacity-60"
           >
             <Send size={16} />
-            {isRunningDue ? 'Running...' : 'Run Publish Queue'}
+            {isRunningDue ? 'Running...' : 'Move Drafts & Publish'}
           </button>
           <Link
             href="/posts/new"
@@ -275,9 +312,15 @@ export default function AutomationPage() {
                           </div>
                         </td>
                         <td className="py-3 pr-2 text-text-primary font-semibold">
-                          {toStatus(post)}
+                          <div className="inline-flex items-center gap-2">
+                            <StatusIndicator post={post} />
+                            <span>{toStatus(post)}</span>
+                          </div>
                           {post.approvalStatus && (
                             <span className="block text-xs text-text-secondary mt-1">Approval: {post.approvalStatus}</span>
+                          )}
+                          {post.lastError && (
+                            <span className="block text-xs text-red-600 mt-1 truncate max-w-[240px]">{post.lastError}</span>
                           )}
                         </td>
                         <td className="py-3 pr-2 text-text-primary">{post.sourceType || 'manual'}</td>
@@ -336,4 +379,24 @@ export default function AutomationPage() {
       </div>
     </section>
   );
+}
+
+function StatusIndicator({ post }: { post: PostItem }) {
+  if (hasError(post)) {
+    return <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500" title="Error" />;
+  }
+
+  if (isPublished(post)) {
+    return <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500" title="Published" />;
+  }
+
+  if (isScheduled(post)) {
+    return <Flag size={12} className="text-amber-500" title="Scheduled" />;
+  }
+
+  if (isDraft(post)) {
+    return <span className="inline-block w-2.5 h-2.5 rounded-full bg-slate-400" title="Draft" />;
+  }
+
+  return <span className="inline-block w-2.5 h-2.5 rounded-full bg-slate-300" title="Unknown" />;
 }

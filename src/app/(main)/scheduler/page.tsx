@@ -33,6 +33,28 @@ function formatStatus(raw?: string): string {
   return raw.replace(/([A-Z])/g, ' $1').replace(/[_-]/g, ' ').trim();
 }
 
+function isDraftPost(status?: string, publishMode?: string): boolean {
+  const normalizedStatus = (status ?? '').toLowerCase();
+  const normalizedMode = (publishMode ?? '').toLowerCase();
+
+  const isPublished =
+    normalizedStatus.includes('published') ||
+    normalizedStatus.includes('success') ||
+    normalizedStatus.includes('complete');
+  const isFailed =
+    normalizedStatus.includes('error') ||
+    normalizedStatus.includes('failed') ||
+    normalizedStatus.includes('rejected');
+
+  if (isPublished || isFailed) return false;
+
+  // Primary rule: explicit draft status from backend.
+  if (normalizedStatus.includes('draft')) return true;
+
+  // Fallback for older payloads where status can be missing.
+  return !normalizedStatus && (normalizedMode === 'manual' || normalizedMode === 'manualdraft');
+}
+
 export default function SchedulerPage() {
   const { posts, isLoading, error, updateExistingPost } = usePosts();
   const [localTimes, setLocalTimes] = useState<Record<string, string>>({});
@@ -42,12 +64,7 @@ export default function SchedulerPage() {
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
   const schedulerPosts = useMemo(() => {
-    return posts.filter((post) => {
-      const mode = (post.publishMode ?? '').toLowerCase();
-      const status = (post.status ?? '').toLowerCase();
-      const hasSchedule = typeof post.scheduledFor === 'string' && post.scheduledFor.length > 0;
-      return mode === 'scheduled' || mode === 'manual' || mode === 'manualdraft' || status.includes('draft') || hasSchedule;
-    });
+    return posts.filter((post) => isDraftPost(post.status, post.publishMode));
   }, [posts]);
 
   async function saveSchedule(postId: string, fallbackTime?: string | null) {
@@ -76,7 +93,7 @@ export default function SchedulerPage() {
       <div className="mb-8">
         <h1 className="text-4xl font-black text-text-primary tracking-tight">Scheduler</h1>
         <p className="text-text-secondary mt-2 font-medium">
-          Scheduled draft posts with editable posting times.
+          Draft posts only with editable posting times.
         </p>
       </div>
 
@@ -89,15 +106,15 @@ export default function SchedulerPage() {
 
       <div className="bg-bg-primary rounded-[32px] border border-text-secondary/10 p-6 md:p-8 shadow-sm">
         {isLoading ? (
-          <p className="text-sm text-text-secondary">Loading scheduled posts...</p>
+          <p className="text-sm text-text-secondary">Loading draft posts...</p>
         ) : schedulerPosts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="w-20 h-20 bg-[#F3E8FF] text-[#7C3AED] rounded-full flex items-center justify-center mb-6">
               <Calendar size={32} />
             </div>
-            <h2 className="text-2xl font-black text-text-primary mb-2">No Scheduled Draft Posts</h2>
+            <h2 className="text-2xl font-black text-text-primary mb-2">No Draft Posts</h2>
             <p className="text-text-secondary font-medium mb-8 max-w-sm">
-              Create a post first, then schedule it from the Automation module.
+              Create a draft post first, then schedule it from the Automation module.
             </p>
             <Link
               href="/posts"

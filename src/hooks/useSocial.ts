@@ -11,6 +11,7 @@ export interface PlatformStatus {
   status: ConnectionStatus;
   providerAccountName?: string | null;
   username: string | null;
+  socialConnectionId?: string | null;
 }
 
 const POLL_INTERVAL_MS = 20_000; // Auto-refresh every 20 seconds
@@ -53,10 +54,10 @@ export function useSocial() {
       if (responses.some((r) => r.unauthorized)) return;
 
       const mappedConnections: Record<PlatformKey, PlatformStatus> = {
-        instagram: { connected: false, status: 'disconnected', username: null, providerAccountName: null },
-        'google-business-profile': { connected: false, status: 'disconnected', username: null, providerAccountName: null },
-        facebook: { connected: false, status: 'disconnected', username: null, providerAccountName: null },
-        linkedin: { connected: false, status: 'disconnected', username: null, providerAccountName: null },
+        instagram: { connected: false, status: 'disconnected', username: null, providerAccountName: null, socialConnectionId: null },
+        'google-business-profile': { connected: false, status: 'disconnected', username: null, providerAccountName: null, socialConnectionId: null },
+        facebook: { connected: false, status: 'disconnected', username: null, providerAccountName: null, socialConnectionId: null },
+        linkedin: { connected: false, status: 'disconnected', username: null, providerAccountName: null, socialConnectionId: null },
       };
 
       for (const item of responses) {
@@ -68,12 +69,18 @@ export function useSocial() {
           (connection?.providerAccountName as string | null | undefined) ??
           (connection?.providerAccountId as string | null | undefined) ??
           null;
+        const socialConnectionId =
+          (item.data?.socialConnectionId as string | null | undefined) ??
+          (connection?.id as string | null | undefined) ??
+          (connection?.socialConnectionId as string | null | undefined) ??
+          null;
 
         mappedConnections[item.platform] = {
           connected: status === 'connected',
           status: status === 'connected' ? 'connected' : 'disconnected',
           username: status === 'connected' ? username : null,
           providerAccountName: status === 'connected' ? username : null,
+          socialConnectionId: status === 'connected' ? socialConnectionId : null,
         };
       }
 

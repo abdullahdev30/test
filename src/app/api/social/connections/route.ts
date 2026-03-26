@@ -19,12 +19,12 @@ export async function GET() {
 
   // Read cached connection data (written by callback + status sync)
   const raw = cookieStore.get(PLATFORM_CONNECTIONS_COOKIE)?.value;
-  let cached: Record<string, { status?: string; username?: string | null; providerAccountName?: string | null }> = {};
+  let cached: Record<string, { status?: string; username?: string | null; providerAccountName?: string | null; socialConnectionId?: string | null }> = {};
   try { cached = raw ? JSON.parse(raw) : {}; } catch { cached = {}; }
 
   // Build response — UI gets instant data with no extra backend calls
   const result = PLATFORMS.reduce<
-    Record<string, { connected: boolean; username: string | null; providerAccountName: string | null; status: string }>
+    Record<string, { connected: boolean; username: string | null; providerAccountName: string | null; socialConnectionId: string | null; status: string }>
   >((acc, p) => {
     // Backward compatibility: old key "google" -> new key "google-business-profile"
     const entry = p === 'google-business-profile' ? (cached[p] ?? cached.google) : cached[p];
@@ -33,6 +33,7 @@ export async function GET() {
       connected: entry?.status === 'connected',
       username: name,
       providerAccountName: name,
+      socialConnectionId: entry?.socialConnectionId ?? null,
       status: entry?.status ?? 'disconnected',
     };
     return acc;

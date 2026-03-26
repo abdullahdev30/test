@@ -100,12 +100,18 @@ export async function GET(
     if (action === 'status') {
       const conn = data?.connection;
       const username = conn?.providerAccountName || conn?.providerAccountId || data?.username || null;
+      const socialConnectionId =
+        conn?.id ||
+        conn?.socialConnectionId ||
+        data?.socialConnectionId ||
+        null;
       const connections = await getPlatformConnections();
       if (data?.status === 'connected') {
         connections[platform] = {
           status: 'connected',
           username,
           providerAccountName: username,
+          socialConnectionId,
         };
       } else {
         delete connections[platform];
@@ -118,6 +124,7 @@ export async function GET(
         connected: data?.status === 'connected',
         username: data?.status === 'connected' ? username : null,
         providerAccountName: data?.status === 'connected' ? username : null,
+        socialConnectionId: data?.status === 'connected' ? socialConnectionId : null,
       });
     }
 

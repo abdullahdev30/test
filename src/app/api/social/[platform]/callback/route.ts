@@ -76,6 +76,7 @@ export async function GET(
     );
   }
   let username: string | null = null;
+  let socialConnectionId: string | null = null;
 
   try {
     const callbackUrl = new URL(`${baseUrl}/social-connections/${platform}/callback`);
@@ -105,6 +106,11 @@ export async function GET(
       (conn?.providerAccountId as string) ??
       (data?.metadata?.email as string) ??
       null;
+    socialConnectionId =
+      (conn?.id as string) ??
+      (conn?.socialConnectionId as string) ??
+      (data?.socialConnectionId as string) ??
+      null;
 
     // ── 4. If username still missing, call status endpoint for it ─────────
     if (!username) {
@@ -120,6 +126,10 @@ export async function GET(
           (sc?.providerAccountName as string) ??
           (sc?.providerAccountId as string) ??
           null;
+        socialConnectionId =
+          (sc?.id as string) ??
+          (sc?.socialConnectionId as string) ??
+          socialConnectionId;
       }
     }
   } catch {
@@ -137,6 +147,7 @@ export async function GET(
     status: 'connected',
     username,
     providerAccountName: username, // always store both for compatibility
+    socialConnectionId,
   };
 
   // ── 6. Redirect to /connections — NOT /dashboard ──────────────────────────

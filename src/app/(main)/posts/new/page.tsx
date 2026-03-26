@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, CalendarDays, Clock3, ImagePlus, Plus } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { ArrowLeft, CalendarDays, Clock3, ImagePlus, Plus, RefreshCw } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { usePosts } from '@/hooks/usePosts';
 import type { CreatePostInput } from '@/lib/schemas';
 
@@ -17,6 +17,38 @@ const PLATFORM_OPTIONS: Array<{ label: string; value: Provider }> = [
   { label: 'Instagram', value: 'instagram' },
   { label: 'Google Business Profile', value: 'google_business_profile' },
 ];
+
+const PROVIDER_TO_CONNECTION_KEY: Record<Provider, string> = {
+  linkedin: 'linkedin',
+  facebook: 'facebook',
+  instagram: 'instagram',
+  google_business_profile: 'google-business-profile',
+};
+
+interface SocialConnection {
+  connected: boolean;
+  status: string;
+  socialConnectionId: string | null;
+  username?: string | null;
+  providerAccountName?: string | null;
+}
+
+function extractSocialConnectionId(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const record = payload as Record<string, unknown>;
+  const connection = (record.connection && typeof record.connection === 'object')
+    ? (record.connection as Record<string, unknown>)
+    : null;
+
+  const fromRoot =
+    (record.socialConnectionId as string | undefined) ??
+    (record.id as string | undefined);
+  const fromConnection =
+    (connection?.socialConnectionId as string | undefined) ??
+    (connection?.id as string | undefined);
+
+  return fromConnection ?? fromRoot ?? null;
+}
 
 function combineDateAndTime(dateValue: string, timeValue: string): string | null {
   if (!dateValue || !timeValue) return null;
@@ -52,6 +84,9 @@ export default function CreateAutomationPostPage() {
   const [assetFile, setAssetFile] = useState<File | null>(null);
   const [queueAfterCreate, setQueueAfterCreate] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingConnections, setIsLoadingConnections] = useState(false);
+  const [connectionData, setConnectionData] = useState<Record<string, SocialConnection>>({});
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
   const activeProviders = useMemo(
@@ -62,6 +97,56 @@ export default function CreateAutomationPostPage() {
   function toggleProvider(provider: Provider) {
     setSelectedProviders((prev) => ({ ...prev, [provider]: !prev[provider] }));
   }
+
+  async function loadConnections() {
+    setIsLoadingConnections(true);
+    setConnectionError(null);
+    try {
+      const entries = await Promise.all(
+        PLATFORM_OPTIONS.map(async (platform) => {
+          const statusKey = PROVIDER_TO_CONNECTION_KEY[platform.value];
+          const response = await fetch(`/api/social/${statusKey}/status`, {
+            method: 'GET',
+            credentials: 'same-origin',
+            cache: 'no-store',
+          });
+
+          if (!response.ok) {
+            return [statusKey, { connected: false, status: 'disconnected', socialConnectionId: null }] as const;
+          }
+
+          const data = (await response.json()) as Record<string, unknown>;
+          const connected = data.status === 'connected' || data.connected === true;
+          const socialConnectionId = connected ? extractSocialConnectionId(data) : null;
+          const username =
+            (data.providerAccountName as string | undefined) ??
+            (data.username as string | undefined) ??
+            null;
+
+          return [
+            statusKey,
+            {
+              connected,
+              status: connected ? 'connected' : 'disconnected',
+              socialConnectionId,
+              username,
+              providerAccountName: username,
+            },
+          ] as const;
+        }),
+      );
+
+      setConnectionData(Object.fromEntries(entries));
+    } catch {
+      setConnectionError('Failed to load social connection status.');
+    } finally {
+      setIsLoadingConnections(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadConnections();
+  }, []);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -109,9 +194,41 @@ export default function CreateAutomationPostPage() {
         return;
       }
 
+      const latestConnections = await Promise.all(
+        activeProviders.map(async (provider) => {
+          const statusKey = PROVIDER_TO_CONNECTION_KEY[provider];
+          const response = await fetch(`/api/social/${statusKey}/status`, {
+            method: 'GET',
+            credentials: 'same-origin',
+            cache: 'no-store',
+          });
+
+          if (!response.ok) {
+            return { provider, socialConnectionId: null as string | null };
+          }
+
+          const data = (await response.json()) as Record<string, unknown>;
+          const connected = data.status === 'connected' || data.connected === true;
+          const socialConnectionId = connected ? extractSocialConnectionId(data) : null;
+          return { provider, socialConnectionId };
+        }),
+      );
+
+      const disconnected = latestConnections.filter((item) => !item.socialConnectionId);
+      if (disconnected.length > 0) {
+        const names = PLATFORM_OPTIONS
+          .filter((platform) => disconnected.some((entry) => entry.provider === platform.value))
+          .map((platform) => platform.label)
+          .join(', ');
+        setFormError(`Connect platform first (${names}) from Connections page, then try again.`);
+        return;
+      }
+
       const targetResult = await setTargetsForPost(created.post.id, {
         targets: activeProviders.map((provider) => ({
           provider,
+          socialConnectionId:
+            latestConnections.find((entry) => entry.provider === provider)?.socialConnectionId ?? undefined,
           scheduledFor: scheduledFor ?? undefined,
         })),
       });
@@ -165,9 +282,9 @@ export default function CreateAutomationPostPage() {
         </Link>
       </div>
 
-      {formError && (
+      {(formError || connectionError) && (
         <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
-          {formError}
+          {formError || connectionError}
         </div>
       )}
 
@@ -252,16 +369,44 @@ export default function CreateAutomationPostPage() {
           )}
 
           <div className="rounded-2xl border border-text-secondary/10 p-4">
-            <h2 className="text-sm font-black text-text-primary uppercase tracking-wide mb-3">Platforms</h2>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <h2 className="text-sm font-black text-text-primary uppercase tracking-wide">Platforms</h2>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={loadConnections}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-text-secondary/20 text-text-secondary text-xs font-bold hover:text-text-primary hover:border-text-secondary/40 transition-colors"
+                >
+                  <RefreshCw size={12} className={isLoadingConnections ? 'animate-spin' : ''} />
+                  Refresh
+                </button>
+                <Link
+                  href="/connections"
+                  className="inline-flex items-center px-2.5 py-1.5 rounded-lg border border-primary/30 text-primary text-xs font-bold hover:bg-primary/5 transition-colors"
+                >
+                  Connect Platforms
+                </Link>
+              </div>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               {PLATFORM_OPTIONS.map((platform) => (
-                <label key={platform.value} className="inline-flex items-center gap-2 text-sm font-bold text-text-primary">
+                <label key={platform.value} className="inline-flex items-center justify-between gap-2 text-sm font-bold text-text-primary border border-text-secondary/10 rounded-lg px-2.5 py-2">
+                  <span className="inline-flex items-center gap-2">
                   <input
                     type="checkbox"
                     checked={selectedProviders[platform.value]}
                     onChange={() => toggleProvider(platform.value)}
                   />
                   {platform.label}
+                  </span>
+                  <span
+                    className={`inline-block w-2.5 h-2.5 rounded-full ${
+                      connectionData[PROVIDER_TO_CONNECTION_KEY[platform.value]]?.connected
+                        ? 'bg-emerald-500'
+                        : 'bg-red-500'
+                    }`}
+                    title={connectionData[PROVIDER_TO_CONNECTION_KEY[platform.value]]?.connected ? 'Connected' : 'Disconnected'}
+                  />
                 </label>
               ))}
             </div>

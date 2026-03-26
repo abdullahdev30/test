@@ -222,6 +222,10 @@ async function withAuthRetry<T>(operation: (token: string) => Promise<T>): Promi
   }
 }
 
+function toPostPathId(id: string): string {
+  return encodeURIComponent(id.trim());
+}
+
 export async function listPosts() {
   try {
     const result = await withAuthRetry((token) => http.get('/posts', token));
@@ -234,9 +238,10 @@ export async function listPosts() {
 
 export async function getPostById(id: string) {
   if (!id) return { success: false, error: 'Post id is required', post: null as PostItem | null };
+  const postId = toPostPathId(id);
 
   try {
-    const result = await withAuthRetry((token) => http.get(`/posts/${id}`, token));
+    const result = await withAuthRetry((token) => http.get(`/posts/${postId}`, token));
     return { success: true, post: extractPost(result) };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to fetch post';
@@ -261,6 +266,7 @@ export async function createPost(data: CreatePostInput) {
 
 export async function updatePost(id: string, data: UpdatePostInput) {
   if (!id) return { success: false, error: 'Post id is required', post: null as PostItem | null };
+  const postId = toPostPathId(id);
 
   const parsed = UpdatePostSchema.safeParse(data);
   if (!parsed.success) {
@@ -268,7 +274,7 @@ export async function updatePost(id: string, data: UpdatePostInput) {
   }
 
   try {
-    const result = await withAuthRetry((token) => http.patch(`/posts/${id}`, parsed.data, token));
+    const result = await withAuthRetry((token) => http.patch(`/posts/${postId}`, parsed.data, token));
     return { success: true, post: extractPost(result) };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to update post';
@@ -286,12 +292,13 @@ function extractAsset(payload: unknown): PostAsset | null {
 
 export async function attachPostAssets(id: string, data: AttachPostAssetsInput) {
   if (!id) return { success: false, error: 'Post id is required', post: null as PostItem | null };
+  const postId = toPostPathId(id);
   if (!Array.isArray(data.assets) || data.assets.length === 0) {
     return { success: false, error: 'At least one asset is required', post: null as PostItem | null };
   }
 
   try {
-    const result = await withAuthRetry((token) => http.post(`/posts/${id}/assets`, data, token));
+    const result = await withAuthRetry((token) => http.post(`/posts/${postId}/assets`, data, token));
     return {
       success: true,
       post: extractPost(result),
@@ -305,6 +312,7 @@ export async function attachPostAssets(id: string, data: AttachPostAssetsInput) 
 
 export async function uploadPostAsset(id: string, input: UploadPostAssetInput) {
   if (!id) return { success: false, error: 'Post id is required', post: null as PostItem | null };
+  const postId = toPostPathId(id);
   if (!input.file) {
     return { success: false, error: 'Asset file is required', post: null as PostItem | null };
   }
@@ -321,7 +329,7 @@ export async function uploadPostAsset(id: string, input: UploadPostAssetInput) {
 
   try {
     const result = await withAuthRetry((token) =>
-      http.postForm(`/posts/${id}/assets/upload`, formData, token),
+      http.postForm(`/posts/${postId}/assets/upload`, formData, token),
     );
     return {
       success: true,
@@ -346,9 +354,10 @@ export async function listPendingApprovalPosts() {
 
 export async function approvePost(id: string, reason = 'Approved by user') {
   if (!id) return { success: false, error: 'Post id is required' };
+  const postId = toPostPathId(id);
 
   try {
-    await withAuthRetry((token) => http.post(`/posts/${id}/approve`, { reason }, token));
+    await withAuthRetry((token) => http.post(`/posts/${postId}/approve`, { reason }, token));
     return { success: true };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to approve post';
@@ -359,9 +368,10 @@ export async function approvePost(id: string, reason = 'Approved by user') {
 export async function rejectPost(id: string, reason: string) {
   if (!id) return { success: false, error: 'Post id is required' };
   if (!reason.trim()) return { success: false, error: 'Reject reason is required' };
+  const postId = toPostPathId(id);
 
   try {
-    await withAuthRetry((token) => http.post(`/posts/${id}/reject`, { reason }, token));
+    await withAuthRetry((token) => http.post(`/posts/${postId}/reject`, { reason }, token));
     return { success: true };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to reject post';
@@ -371,12 +381,13 @@ export async function rejectPost(id: string, reason: string) {
 
 export async function setPostTargets(id: string, data: SetPostTargetsInput) {
   if (!id) return { success: false, error: 'Post id is required', post: null as PostItem | null };
+  const postId = toPostPathId(id);
   if (!Array.isArray(data.targets) || data.targets.length === 0) {
     return { success: false, error: 'At least one target is required', post: null as PostItem | null };
   }
 
   try {
-    const result = await withAuthRetry((token) => http.put(`/posts/${id}/targets`, data, token));
+    const result = await withAuthRetry((token) => http.put(`/posts/${postId}/targets`, data, token));
     return { success: true, post: extractPost(result), data: result as Record<string, unknown> };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to set post targets';
@@ -386,9 +397,10 @@ export async function setPostTargets(id: string, data: SetPostTargetsInput) {
 
 export async function queuePostPublish(id: string) {
   if (!id) return { success: false, error: 'Post id is required', data: null as Record<string, unknown> | null };
+  const postId = toPostPathId(id);
 
   try {
-    const result = await withAuthRetry((token) => http.post(`/posts/${id}/queue-publish`, {}, token));
+    const result = await withAuthRetry((token) => http.post(`/posts/${postId}/queue-publish`, {}, token));
     return { success: true, data: result as Record<string, unknown> };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to queue post for publishing';
