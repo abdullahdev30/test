@@ -10,6 +10,7 @@
  */
 
 import { cookies } from 'next/headers';
+import { refreshWithBackend } from './refresh';
 
 const COOKIE_OPTS = {
   httpOnly: true,
@@ -21,6 +22,7 @@ const COOKIE_OPTS = {
 };
 
 const REFRESH_MAX_AGE = 60 * 60 * 24 * 7; // 7 days (refresh token)
+const ACCESS_MAX_AGE = 60 * 15; // 15 minutes
 
 /** Low-level: just read the raw access_token cookie. */
 export async function getRawToken(): Promise<string | undefined> {
@@ -39,35 +41,21 @@ export async function refreshAccessToken(): Promise<string | null> {
   const refreshToken = store.get('refresh_token')?.value;
   if (!refreshToken) return null;
 
-  const BASE_URL = process.env.API_URL || '';
-
   try {
-    const res = await fetch(`${BASE_URL}/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ refreshToken }),
-      cache: 'no-store',
-    });
-
-    if (!res.ok) {
+    const refreshed = await refreshWithBackend(refreshToken);
+    if (!refreshed?.accessToken) {
       // Refresh token is invalid — clear both cookies.
       store.set('access_token', '', { ...COOKIE_OPTS, maxAge: 0 });
       store.set('refresh_token', '', { ...COOKIE_OPTS, maxAge: 0 });
       return null;
     }
 
-    const data = await res.json();
-    const newAccessToken: string | undefined = data.accessToken ?? data.access_token;
-    const newRefreshToken: string | undefined = data.refreshToken ?? data.refresh_token;
-
-    if (!newAccessToken) return null;
-
-    store.set('access_token', newAccessToken, { ...COOKIE_OPTS, maxAge: 60 * 60 * 24 });
-    if (newRefreshToken) {
-      store.set('refresh_token', newRefreshToken, { ...COOKIE_OPTS, maxAge: REFRESH_MAX_AGE });
+    store.set('access_token', refreshed.accessToken, { ...COOKIE_OPTS, maxAge: ACCESS_MAX_AGE });
+    if (refreshed.refreshToken) {
+      store.set('refresh_token', refreshed.refreshToken, { ...COOKIE_OPTS, maxAge: REFRESH_MAX_AGE });
     }
 
-    return newAccessToken;
+    return refreshed.accessToken;
   } catch {
     return null;
   }

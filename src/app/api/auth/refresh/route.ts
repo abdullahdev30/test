@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { refreshWithBackend } from '@/lib/api/refresh';
 
 const COOKIE_OPTS = {
   httpOnly: true,
@@ -52,40 +53,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No refresh token' }, { status: 401 });
   }
 
-  const BASE_URL = process.env.API_URL || '';
-
   try {
-    const backendRes = await fetch(`${BASE_URL}/auth/refresh`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify({ refreshToken }),
-    });
-
-    if (!backendRes.ok) {
+    const refreshed = await refreshWithBackend(refreshToken);
+    if (!refreshed?.accessToken) {
       // Refresh token invalid/expired — clear cookies and force re-login
       cookieStore.set('access_token', '', { ...COOKIE_OPTS, maxAge: 0 });
       cookieStore.set('refresh_token', '', { ...COOKIE_OPTS, maxAge: 0 });
       return NextResponse.json({ error: 'Refresh failed' }, { status: 401 });
     }
 
-    const data = await backendRes.json();
-    const newAccessToken = data.accessToken || data.access_token;
-    const newRefreshToken = data.refreshToken || data.refresh_token;
-
-    if (!newAccessToken) {
-      return NextResponse.json({ error: 'No access token in refresh response' }, { status: 401 });
-    }
-
     // Set fresh httpOnly cookies
-    cookieStore.set('access_token', newAccessToken, {
+    cookieStore.set('access_token', refreshed.accessToken, {
       ...COOKIE_OPTS,
       maxAge: ACCESS_MAX_AGE,
     });
-    if (newRefreshToken) {
-      cookieStore.set('refresh_token', newRefreshToken, {
+    if (refreshed.refreshToken) {
+      cookieStore.set('refresh_token', refreshed.refreshToken, {
         ...COOKIE_OPTS,
         maxAge: REFRESH_MAX_AGE,
       });

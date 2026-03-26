@@ -12,6 +12,7 @@ export const SignupSchema = z
     email: z.string().email('Invalid email address'),
     password: z.string().min(8, 'Password must be at least 8 characters'),
     confirmPassword: z.string(),
+    timezone: z.string().min(1, 'Timezone is required'),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: 'Passwords do not match',
@@ -29,7 +30,7 @@ export const ForgotPasswordSchema = z.object({
 
 export const VerifyResetOtpSchema = z.object({
   email: z.string().email(),
-  otp: z.string().min(4).max(8),
+  otp: z.string().length(6, 'OTP must be 6 digits'),
 });
 
 export const ResetPasswordSchema = z

@@ -1,16 +1,55 @@
 "use client";
 
-import React, { useState, useEffect, useTransition } from 'react';
+import React, { useState, useEffect, useMemo, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { FcGoogle } from "react-icons/fc";
 import {
   Mail, Lock, ArrowRight, CheckCircle2,
-  ShieldCheck, RefreshCw, ChevronLeft,
+  ShieldCheck, RefreshCw, ChevronLeft, Globe2,
   Loader2, Eye, EyeOff
 } from 'lucide-react';
 import { signup, verifyEmail, resendVerification } from '@/lib/api/auth';
 
 const GOOGLE_AUTH_URL = "/api/auth/google";
+const FALLBACK_TIMEZONES = [
+  'UTC',
+  'Asia/Karachi',
+  'Asia/Dubai',
+  'Asia/Kolkata',
+  'Asia/Singapore',
+  'Asia/Tokyo',
+  'Europe/London',
+  'Europe/Berlin',
+  'Europe/Paris',
+  'Europe/Istanbul',
+  'Africa/Cairo',
+  'Africa/Johannesburg',
+  'America/New_York',
+  'America/Chicago',
+  'America/Denver',
+  'America/Los_Angeles',
+  'America/Toronto',
+  'America/Sao_Paulo',
+  'Australia/Sydney',
+  'Pacific/Auckland',
+];
+
+function getTimezoneOptions() {
+  const intlWithSupported = Intl as typeof Intl & {
+    supportedValuesOf?: (key: string) => string[];
+  };
+  if (typeof intlWithSupported.supportedValuesOf === 'function') {
+    const zones = intlWithSupported.supportedValuesOf('timeZone');
+    if (zones.length > 0) return zones;
+  }
+  return FALLBACK_TIMEZONES;
+}
+
+function getDefaultTimezone(timezones: string[]) {
+  const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if (browserTimezone && timezones.includes(browserTimezone)) return browserTimezone;
+  return 'UTC';
+}
 
 const SignupFlow = () => {
   const router = useRouter();
@@ -19,14 +58,16 @@ const SignupFlow = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const timezoneOptions = useMemo(() => getTimezoneOptions(), []);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState(() => ({
     firstName: '',
     lastName: '',
     email: '',
     password: '',
     confirmPassword: '',
-  });
+    timezone: getDefaultTimezone(timezoneOptions),
+  }));
   const [otp, setOtp] = useState('');
 
   useEffect(() => {
@@ -36,7 +77,7 @@ const SignupFlow = () => {
     }
   }, [resendTimer]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
@@ -123,6 +164,23 @@ const SignupFlow = () => {
                   autoComplete="email"
                   className="w-full pl-12 pr-4 py-3 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary"
                 />
+              </div>
+
+              <div className="relative">
+                <Globe2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-txt-secondary pointer-events-none" />
+                <select
+                  name="timezone"
+                  value={formData.timezone}
+                  onChange={handleChange}
+                  className="w-full pl-12 pr-4 py-3 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary"
+                  required
+                >
+                  {timezoneOptions.map((timezone) => (
+                    <option key={timezone} value={timezone}>
+                      {timezone}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="relative">

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { getValidToken } from '@/lib/api/socialAuth';
 
 // ─── Cookie config ────────────────────────────────────────────────────────────
 // path '/' — must be readable by ALL routes (not /connections only)
@@ -13,52 +14,13 @@ const COOKIE_OPTS = {
 
 const PLATFORM_CONNECTIONS_COOKIE = 'platform_connections';
 
-/**
- * Attempt a silent server-to-server token refresh.
- * Returns a fresh access token string, or null on failure.
- */
-async function silentRefresh(): Promise<string | null> {
-  const cookieStore = await cookies();
-  const refreshTok = cookieStore.get('refresh_token')?.value;
-  if (!refreshTok) return null;
-
-  const BASE_URL = process.env.API_URL || '';
-  try {
-    const res = await fetch(`${BASE_URL}/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ refreshToken: refreshTok }),
-      cache: 'no-store',
-    });
-    if (!res.ok) return null;
-
-    const data = await res.json();
-    const newAccessToken: string | undefined = data.accessToken ?? data.access_token;
-    const newRefreshToken: string | undefined = data.refreshToken ?? data.refresh_token;
-    if (!newAccessToken) return null;
-
-    // Set the fresh access_token cookie so subsequent code can read it
-    cookieStore.set('access_token', newAccessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax' as const,
-      path: '/',
-      maxAge: 60 * 60 * 24,
-    });
-    if (newRefreshToken) {
-      cookieStore.set('refresh_token', newRefreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax' as const,
-        path: '/',
-        maxAge: 60 * 60 * 24 * 7,
-      });
-    }
-
-    return newAccessToken;
-  } catch {
-    return null;
-  }
+function resolveSocialBaseUrl(): string {
+  const base =
+    process.env.SOCIAL_BASE_URL ||
+    process.env.NEXT_PUBLIC_SOCIAL_BASE_URL ||
+    process.env.API_URL ||
+    '';
+  return base.replace(/\/+$/, '');
 }
 
 /**
@@ -67,8 +29,8 @@ async function silentRefresh(): Promise<string | null> {
  * The OAuth provider redirects here after user grants permission.
  * Flow:
  *   1. Validate code param from provider.
- *   2. Get access_token from cookie; if missing → try silent refresh.
- *   3. Only redirect to /login if BOTH token AND refresh fail.
+ *   2. Resolve access token using shared getValidToken (auto-refresh from refresh_token).
+ *   3. If both access + refresh are invalid, redirect back to /connections with error.
  *   4. Forward code+state to backend; exchange for platform tokens.
  *   5. Store {status:'connected', username, providerAccountName} in httpOnly cookie.
  *   6. Redirect to /connections?success=<platform> — NEVER to /dashboard.
@@ -95,14 +57,9 @@ export async function GET(
     return NextResponse.redirect(new URL('/connections?error=no_code', request.url));
   }
 
-  // ── 2. Resolve access token (with silent refresh fallback) ────────────────
+  // ── 2. Resolve access token (with shared silent refresh fallback) ─────────
   const cookieStore = await cookies();
-  let token = cookieStore.get('access_token')?.value;
-
-  if (!token) {
-    // Try silent refresh BEFORE ever touching /login
-    token = await silentRefresh() ?? undefined;
-  }
+  const token = await getValidToken();
 
   if (!token) {
     // Stay on the connections screen and show an inline error instead of forcing login.
@@ -112,7 +69,12 @@ export async function GET(
   }
 
   // ── 3. Forward code+state to backend ─────────────────────────────────────
-  const baseUrl = process.env.NEXT_PUBLIC_SOCIAL_BASE_URL;
+  const baseUrl = resolveSocialBaseUrl();
+  if (!baseUrl) {
+    return NextResponse.redirect(
+      new URL(`/connections?error=missing_social_base_url&platform=${platform}`, request.url),
+    );
+  }
   let username: string | null = null;
 
   try {

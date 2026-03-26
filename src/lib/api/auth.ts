@@ -1,7 +1,8 @@
 'use server';
 
 import { cookies } from 'next/headers';
-import { http } from '../http';
+import { http, type HttpError } from '../http';
+import { refreshWithBackend } from './refresh';
 import {
   LoginSchema,
   SignupSchema,
@@ -10,6 +11,7 @@ import {
   ResetPasswordSchema,
   ChangePasswordSchema,
   SetPasswordSchema,
+  VerifyResetOtpSchema,
 } from '../schemas';
 
 const COOKIE_OPTS = {
@@ -23,8 +25,37 @@ const COOKIE_OPTS = {
   path: '/',
 };
 
-const ACCESS_MAX_AGE = 60 * 15;          // 15 minutes
+const ACCESS_MAX_AGE = 60 * 60* 24;          // 24 hours
 const REFRESH_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
+
+function isUnauthorizedError(err: unknown): boolean {
+  return !!(err && typeof err === 'object' && (err as HttpError).status === 401);
+}
+
+async function postWithFallback<TBody extends Record<string, unknown>>(
+  endpoints: string[],
+  body: TBody,
+  token?: string,
+) {
+  let lastError: unknown = null;
+
+  for (const endpoint of endpoints) {
+    try {
+      return await http.post(endpoint, body, token);
+    } catch (err: unknown) {
+      const status = (err as HttpError)?.status;
+      // Continue only when endpoint is missing/unsupported.
+      if (status === 404 || status === 405) {
+        lastError = err;
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  if (lastError) throw lastError;
+  throw new Error('No valid endpoint found');
+}
 
 /** Read the access token from httpOnly cookies (server-side only) */
 async function getAccessToken(): Promise<string | undefined> {
@@ -78,17 +109,13 @@ export async function refreshAccessToken() {
   }
 
   try {
-    const data = await http.post('/auth/refresh', { refreshToken });
-
-    const newAccessToken = data.accessToken || data.access_token;
-    const newRefreshToken = data.refreshToken || data.refresh_token;
-
-    if (!newAccessToken) {
+    const refreshed = await refreshWithBackend(refreshToken);
+    if (!refreshed?.accessToken) {
       await clearAuthCookies();
       return { success: false, error: 'Refresh returned no token' };
     }
 
-    await setAuthCookies(newAccessToken, newRefreshToken ?? refreshToken);
+    await setAuthCookies(refreshed.accessToken, refreshed.refreshToken ?? refreshToken);
     return { success: true };
   } catch {
     await clearAuthCookies();
@@ -132,6 +159,7 @@ export async function signup(data: {
   email: string;
   password: string;
   confirmPassword: string;
+  timezone: string;
 }) {
   const parsed = SignupSchema.safeParse(data);
   if (!parsed.success) {
@@ -139,12 +167,13 @@ export async function signup(data: {
   }
 
   try {
-    await http.post('/auth/register', {
+    await postWithFallback(['/auth/signup', '/auth/register'], {
       firstName: parsed.data.firstName,
       lastName: parsed.data.lastName,
       email: parsed.data.email,
       password: parsed.data.password,
-      timezone: 'UTC',
+      confirmPassword: parsed.data.confirmPassword,
+      timezone: parsed.data.timezone,
     });
     return { success: true };
   } catch (err: unknown) {
@@ -263,9 +292,22 @@ export async function forgotPassword(email: string) {
 
 /** verifyResetOtp(email, otp) — verifies reset OTP and returns resetToken */
 export async function verifyResetOtp(email: string, otp: string) {
+  const parsed = VerifyResetOtpSchema.safeParse({ email, otp });
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0].message, resetToken: undefined };
+  }
+
   try {
-    const data = await http.post('/auth/verify-reset-otp', { email, otp });
-    const resetToken = data.resetToken || data.token;
+    const data = await http.post('/auth/verify-reset-otp', {
+      email: parsed.data.email,
+      otp: parsed.data.otp,
+    });
+    const resetToken =
+      data.resetToken ||
+      data.reset_token ||
+      data.refreshToken ||
+      data.refresh_token ||
+      data.token;
     return { success: true, resetToken };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'OTP verification failed';
@@ -325,6 +367,28 @@ export async function changePassword(data: {
     );
     return { success: true };
   } catch (err: unknown) {
+    if (isUnauthorizedError(err)) {
+      const refreshed = await refreshAccessToken();
+      if (refreshed.success) {
+        const newToken = await getAccessToken();
+        if (newToken) {
+          try {
+            await http.post(
+              '/auth/change-password',
+              {
+                currentPassword: parsed.data.currentPassword,
+                newPassword: parsed.data.newPassword,
+                confirmPassword: parsed.data.confirmPassword,
+              },
+              newToken,
+            );
+            return { success: true };
+          } catch {
+            // fall through
+          }
+        }
+      }
+    }
     const message = err instanceof Error ? err.message : 'Failed to change password';
     return { success: false, error: message };
   }
@@ -351,6 +415,27 @@ export async function setPassword(data: { password: string; confirmPassword: str
     );
     return { success: true };
   } catch (err: unknown) {
+    if (isUnauthorizedError(err)) {
+      const refreshed = await refreshAccessToken();
+      if (refreshed.success) {
+        const newToken = await getAccessToken();
+        if (newToken) {
+          try {
+            await http.post(
+              '/auth/set-password',
+              {
+                password: parsed.data.password,
+                confirmPassword: parsed.data.confirmPassword,
+              },
+              newToken,
+            );
+            return { success: true };
+          } catch {
+            // fall through
+          }
+        }
+      }
+    }
     const message = err instanceof Error ? err.message : 'Failed to set password';
     return { success: false, error: message };
   }

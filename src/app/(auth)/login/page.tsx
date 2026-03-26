@@ -1,15 +1,14 @@
 "use client";
 
 import React, { useState, useTransition, FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FcGoogle } from "react-icons/fc";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { login } from "@/lib/api/auth";
 
-const GOOGLE_AUTH_URL = "/api/auth/google"; // proxied — never expose backend URL to client
-
 const LoginPage = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -17,8 +16,10 @@ const LoginPage = () => {
   const [isPending, startTransition] = useTransition();
 
   const handleGoogleLogin = () => {
+    const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
+    const oauthUrl = `/api/auth/google?next=${encodeURIComponent(callbackUrl)}`;
     // Redirect through a server-side proxy — backend URL never exposed
-    window.location.href = GOOGLE_AUTH_URL;
+    window.location.href = oauthUrl;
   };
 
   const handleLogin = (e: FormEvent) => {

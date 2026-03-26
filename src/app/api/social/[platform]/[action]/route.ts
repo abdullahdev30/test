@@ -14,6 +14,15 @@ const COOKIE_OPTS = {
 const PLATFORM_CONNECTIONS_COOKIE = 'platform_connections';
 const CONNECTIONS_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 
+function resolveSocialBaseUrl(): string {
+  const base =
+    process.env.SOCIAL_BASE_URL ||
+    process.env.NEXT_PUBLIC_SOCIAL_BASE_URL ||
+    process.env.API_URL ||
+    '';
+  return base.replace(/\/+$/, '');
+}
+
 /** Read the cached platform_connections JSON cookie */
 async function getPlatformConnections(): Promise<Record<string, unknown>> {
   const cookieStore = await cookies();
@@ -38,7 +47,10 @@ export async function GET(
   { params }: { params: Promise<{ platform: string; action: string }> }
 ) {
   const { platform, action } = await params;
-  const baseUrl = process.env.NEXT_PUBLIC_SOCIAL_BASE_URL;
+  const baseUrl = resolveSocialBaseUrl();
+  if (!baseUrl) {
+    return NextResponse.json({ error: 'Social API base URL is not configured' }, { status: 500 });
+  }
 
   // getValidToken() auto-refreshes if access_token cookie is missing
   const token = await getValidToken();
@@ -123,7 +135,10 @@ export async function POST(
   { params }: { params: Promise<{ platform: string; action: string }> }
 ) {
   const { platform, action } = await params;
-  const baseUrl = process.env.NEXT_PUBLIC_SOCIAL_BASE_URL;
+  const baseUrl = resolveSocialBaseUrl();
+  if (!baseUrl) {
+    return NextResponse.json({ error: 'Social API base URL is not configured' }, { status: 500 });
+  }
 
   // Auto-refresh on missing access_token
   const token = await getValidToken();
@@ -220,7 +235,10 @@ export async function DELETE(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_SOCIAL_BASE_URL;
+  const baseUrl = resolveSocialBaseUrl();
+  if (!baseUrl) {
+    return NextResponse.json({ error: 'Social API base URL is not configured' }, { status: 500 });
+  }
   try {
     let res = await fetch(`${baseUrl}/social-connections/${platform}/disconnect`, {
       method: 'DELETE',
