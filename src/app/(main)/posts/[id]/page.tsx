@@ -562,7 +562,7 @@ export default function AutomationPostDetailsPage() {
                   disabled={isApproving}
                   variant="outline"
                   size="sm"
-                  className="rounded-lg border-emerald-300 text-emerald-700 text-xs hover:bg-emerald-50"
+                  className="rounded-lg border-emerald-300  text-emerald-700  text-xs hover:bg-emerald-50"
                 >
                   <ShieldCheck size={14} />
                   {isApproving ? '...' : 'Approve'}

@@ -9,7 +9,6 @@ import { Card } from '@/components/common';
 const navLinks = [
   { label: "Profile", href: "/settings/profile", icon: User },
   { label: "Security", href: "/settings/security", icon: Shield },
-  { label: "General", href: "/settings/general", icon: Factory },
 ];
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {

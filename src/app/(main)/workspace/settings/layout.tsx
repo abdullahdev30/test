@@ -16,7 +16,6 @@ export default function WorkspaceSettingsLayout({
   const links = [
     { title: "Business Profile", href: "/workspace/settings/profile", icon: UserCircle },
     { title: "Keywords", href: "/workspace/settings/keywords", icon: Key },
-    { title: "Team", href: "/workspace/settings/team", icon: Users },
   ];
 
   return (
