@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useMemo, useState, useTransition } from 'react';
-import { AlertCircle, Settings, LayoutDashboard, Key, ExternalLink, ActivitySquare, Loader2, PlusCircle } from 'lucide-react';
+import { AlertCircle, Settings, LayoutDashboard, Key, ExternalLink, ActivitySquare, PlusCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useWorkspace } from '@/hooks/useWorkspace';
+import { Alert, Button, Card, Input, Spinner } from '@/components/common';
 
 function slugify(name: string): string {
   return name
@@ -72,7 +73,7 @@ export default function WorkspaceOverviewPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader2 size={32} className="animate-spin text-primary opacity-60" />
+        <Spinner size="lg" className="text-primary opacity-60" />
       </div>
     );
   }
@@ -80,7 +81,7 @@ export default function WorkspaceOverviewPage() {
   if (!workspace) {
     return (
       <div className="p-8 max-w-4xl mx-auto min-h-screen font-sans">
-        <div className="bg-bg-primary rounded-2xl border border-text-secondary/10 p-8 shadow-sm">
+        <Card className="rounded-2xl p-8 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
             <PlusCircle size={22} className="text-primary" />
             <h1 className="text-2xl font-semibold text-text-primary">Create Your Workspace</h1>
@@ -90,27 +91,29 @@ export default function WorkspaceOverviewPage() {
           </p>
 
           {createError && (
-            <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 text-sm">
+            <Alert variant="alert" className="mb-4 text-sm">
               {createError}
-            </div>
+            </Alert>
           )}
 
           <div className="flex flex-col md:flex-row gap-3">
-            <input
+            <Input
               value={newWorkspaceName}
               onChange={(e) => setNewWorkspaceName(e.target.value)}
               placeholder="Workspace name (e.g. Albatross Vibe)"
-              className="flex-1 px-4 py-3 bg-background border border-text-secondary/10 rounded-lg text-sm text-text-primary focus:outline-none focus:border-primary"
+              className="flex-1 border-text-secondary/10 rounded-lg"
+              variant="filled"
             />
-            <button
+            <Button
               onClick={handleCreateWorkspace}
               disabled={isCreating || !newWorkspaceName.trim()}
-              className="px-6 py-3 bg-primary text-white rounded-lg text-sm font-semibold hover:opacity-90 disabled:opacity-50"
+              isLoading={isCreating}
+              className="px-6 py-3 rounded-lg text-sm font-semibold"
             >
-              {isCreating ? 'Creating...' : 'Create Workspace'}
-            </button>
+              Create Workspace
+            </Button>
           </div>
-        </div>
+        </Card>
       </div>
     );
   }
@@ -121,7 +124,7 @@ export default function WorkspaceOverviewPage() {
   return (
     <div className="p-8 max-w-[1600px] mx-auto min-h-screen font-sans">
       {!isOnboarded && (
-        <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-4 mb-8 flex items-center justify-between">
+        <Card className="bg-orange-500/10 border-orange-500/20 rounded-lg p-4 mb-8 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="text-orange-600 bg-orange-500/20 p-2 rounded-md">
               <AlertCircle size={20} />
@@ -134,7 +137,7 @@ export default function WorkspaceOverviewPage() {
           <Link href="/workspace/onboarding" className="px-4 py-2 bg-text-primary text-background rounded-lg text-xs font-semibold hover:opacity-90 transition-opacity">
             Complete Onboarding
           </Link>
-        </div>
+        </Card>
       )}
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10 pb-6 border-b border-text-secondary/10">
@@ -159,7 +162,7 @@ export default function WorkspaceOverviewPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className="bg-bg-primary rounded-lg border border-text-secondary/10 p-8 shadow-sm h-full flex flex-col">
+        <Card className="rounded-lg p-8 shadow-sm h-full flex flex-col">
           <div className="flex items-center gap-3 mb-6">
             <ActivitySquare size={20} className="text-emerald-500" strokeWidth={1.5} />
             <h2 className="text-lg font-semibold text-text-primary tracking-tight">Business Health</h2>
@@ -178,23 +181,23 @@ export default function WorkspaceOverviewPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-4 mt-8">
-              <div className="p-4 bg-background border border-text-secondary/10 rounded-lg">
+              <Card variant="soft" className="p-4 rounded-lg">
                 <p className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-1">Identity Tone</p>
                 <p className={`text-sm font-semibold ${businessProfile?.brandTone ? 'text-text-primary' : 'text-orange-500'}`}>
                   {businessProfile?.brandTone ?? 'Missing'}
                 </p>
-              </div>
-              <div className="p-4 bg-background border border-text-secondary/10 rounded-lg">
+              </Card>
+              <Card variant="soft" className="p-4 rounded-lg">
                 <p className="text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-1">Target Audience</p>
                 <p className={`text-sm font-semibold ${businessProfile?.targetAudience ? 'text-text-primary' : 'text-orange-500'}`}>
                   {businessProfile?.targetAudience ?? 'Missing'}
                 </p>
-              </div>
+              </Card>
             </div>
           </div>
-        </div>
+        </Card>
 
-        <div className="bg-bg-primary rounded-lg border border-text-secondary/10 p-8 shadow-sm h-full flex flex-col">
+        <Card className="rounded-lg p-8 shadow-sm h-full flex flex-col">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <Key size={20} className="text-primary" strokeWidth={1.5} />
@@ -207,18 +210,18 @@ export default function WorkspaceOverviewPage() {
           <p className="text-sm text-text-secondary mb-6">Loaded from `/workspace/me/keywords`.</p>
 
           <div className="grid grid-cols-3 gap-3 mb-5">
-            <div className="p-3 bg-background border border-text-secondary/10 rounded-lg">
+            <Card variant="soft" className="p-3 rounded-lg">
               <p className="text-[10px] uppercase text-text-secondary font-bold">Total</p>
               <p className="text-lg font-semibold text-text-primary">{keywordStats.total}</p>
-            </div>
-            <div className="p-3 bg-background border border-text-secondary/10 rounded-lg">
+            </Card>
+            <Card variant="soft" className="p-3 rounded-lg">
               <p className="text-[10px] uppercase text-text-secondary font-bold">Primary</p>
               <p className="text-lg font-semibold text-text-primary">{keywordStats.primary}</p>
-            </div>
-            <div className="p-3 bg-background border border-text-secondary/10 rounded-lg">
+            </Card>
+            <Card variant="soft" className="p-3 rounded-lg">
               <p className="text-[10px] uppercase text-text-secondary font-bold">Secondary</p>
               <p className="text-lg font-semibold text-text-primary">{keywordStats.secondary}</p>
-            </div>
+            </Card>
           </div>
 
           <div className="space-y-2 max-h-56 overflow-auto">
@@ -226,14 +229,14 @@ export default function WorkspaceOverviewPage() {
               <p className="text-sm text-text-secondary">No keywords yet.</p>
             ) : (
               keywords.slice(0, 8).map((kw) => (
-                <div key={kw.id} className="flex items-center justify-between px-3 py-2 bg-background border border-text-secondary/10 rounded-lg">
+                <Card key={kw.id} variant="soft" className="flex items-center justify-between px-3 py-2 rounded-lg">
                   <span className="text-sm text-text-primary">{kw.keyword}</span>
                   <span className="text-[10px] uppercase font-bold text-text-secondary">{kw.keywordType}</span>
-                </div>
+                </Card>
               ))
             )}
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   );

@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useMemo, useState, useTransition } from 'react';
-import { Plus, Trash2, Edit3, Key, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Edit3, Key } from 'lucide-react';
 import { useWorkspace } from '@/hooks/useWorkspace';
+import { Alert, Button, Input, Select, Spinner } from '@/components/common';
 
 export default function KeywordStrategyPage() {
   const { keywords, isLoading, addKeyword, updateKeyword, deleteKeyword, deleteAllKeywords, replaceKeywords } = useWorkspace();
@@ -124,68 +125,79 @@ export default function KeywordStrategyPage() {
 
 
         <div className="flex items-center gap-3">
-          <button
+          <Button
             onClick={handleReplaceUsingVisible}
             disabled={isPending || isLoading}
-            className="px-4 py-2 border border-text-secondary/20 text-text-secondary text-xs font-semibold rounded-lg hover:bg-background transition-colors disabled:opacity-50"
+            variant="outline"
+            size="sm"
+            className="text-text-secondary text-xs hover:bg-background"
           >
             Bulk Replace
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleAddKeyword}
             disabled={isPending || isLoading || !newKeyword.trim()}
-            className="flex items-center gap-2 px-5 py-2 bg-text-primary text-background rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
+            isLoading={isPending}
+            className="gap-2 px-5 py-2 bg-text-primary text-background rounded-lg text-sm font-semibold hover:opacity-90"
           >
-            {isPending ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} Add Keyword
-          </button>
+            <Plus size={16} /> Add Keyword
+          </Button>
         </div>
       </div>
 
       {error && (
-        <div className="mb-4 px-3 py-2 text-xs rounded-lg bg-red-500/10 border border-red-500/20 text-red-600">
+        <Alert variant="alert" className="mb-4 text-xs">
           {error}
-        </div>
+        </Alert>
       )}
 
       {/* Utilities */}
       <div className="flex justify-between items-center mb-4">
         <div className="flex gap-3 w-full max-w-xl">
-          <input
+          <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search keywords..."
-            className="px-4 py-2 text-sm bg-background border border-text-secondary/10 rounded-lg w-64 focus:outline-none focus:border-primary"
+            className="w-64 border-text-secondary/10 rounded-lg"
+            variant="filled"
+            size="sm"
           />
-          <input
+          <Input
             value={newKeyword}
             onChange={(e) => setNewKeyword(e.target.value)}
             placeholder="New keyword..."
-            className="px-4 py-2 text-sm bg-background border border-text-secondary/10 rounded-lg flex-1 focus:outline-none focus:border-primary"
+            className="flex-1 border-text-secondary/10 rounded-lg"
+            variant="filled"
+            size="sm"
           />
-          <select
+          <Select
             value={newType}
             onChange={(e) => setNewType((e.target.value === 'secondary' ? 'secondary' : 'primary'))}
-            className="px-3 py-2 text-sm bg-background border border-text-secondary/10 rounded-lg focus:outline-none focus:border-primary"
+            className="border-text-secondary/10 rounded-lg"
+            variant="filled"
+            size="sm"
           >
             <option value="primary">Primary</option>
             <option value="secondary">Secondary</option>
-          </select>
+          </Select>
         </div>
-        <button
+        <Button
           onClick={handleClearAll}
           disabled={isPending || isLoading || keywords.length === 0}
-          className="text-xs font-semibold text-red-500 hover:text-red-700 transition-colors flex items-center gap-1 disabled:opacity-50"
+          variant="ghost"
+          size="sm"
+          className="text-xs font-semibold text-red-500 hover:text-red-700"
         >
           <Trash2 size={12} /> Clear All
-        </button>
+        </Button>
       </div>
 
       {/* Grid View Table */}
       <div className="w-full border border-text-secondary/10 rounded-lg overflow-hidden bg-background flex-1">
         {isLoading ? (
-          <div className="h-full min-h-[320px] flex items-center justify-center">
-            <Loader2 size={28} className="animate-spin text-primary/70" />
-          </div>
+            <div className="h-full min-h-[320px] flex items-center justify-center">
+            <Spinner size="lg" className="text-primary/70" />
+            </div>
         ) : (
           <>
             <table className="w-full text-left border-collapse">
@@ -206,10 +218,12 @@ export default function KeywordStrategyPage() {
                     <tr key={kw.id} className="border-b border-text-secondary/5 hover:bg-bg-primary/50 transition-colors">
                       <td className="px-6 py-4">
                         {isEditingRow ? (
-                          <input
+                          <Input
                             value={editKeyword}
                             onChange={(e) => setEditKeyword(e.target.value)}
-                            className="px-3 py-1.5 text-sm bg-background border border-text-secondary/20 rounded-md focus:outline-none focus:border-primary w-full"
+                            className="w-full border-text-secondary/20 rounded-md"
+                            variant="filled"
+                            size="sm"
                           />
                         ) : (
                           <span className="text-sm font-semibold text-text-primary">{kw.keyword}</span>
@@ -217,14 +231,16 @@ export default function KeywordStrategyPage() {
                       </td>
                       <td className="px-6 py-4">
                         {isEditingRow ? (
-                          <select
+                          <Select
                             value={editType}
                             onChange={(e) => setEditType((e.target.value === 'secondary' ? 'secondary' : 'primary'))}
-                            className="px-2 py-1 text-xs bg-background border border-text-secondary/20 rounded-md focus:outline-none focus:border-primary"
+                            className="border-text-secondary/20 rounded-md"
+                            variant="filled"
+                            size="sm"
                           >
                             <option value="primary">Primary</option>
                             <option value="secondary">Secondary</option>
-                          </select>
+                          </Select>
                         ) : type === 'primary' ? (
                           <span className="inline-block px-2.5 py-1 bg-emerald-500/10 text-emerald-600 text-[10px] font-bold rounded-md uppercase tracking-wider border border-emerald-500/20">
                             Primary
@@ -242,28 +258,32 @@ export default function KeywordStrategyPage() {
                         <div className="flex justify-end gap-3 text-text-secondary">
                           {isEditingRow ? (
                             <>
-                              <button
+                              <Button
                                 onClick={handleSaveEdit}
                                 disabled={isPending || !editKeyword.trim()}
-                                className="hover:text-emerald-600 text-xs font-semibold disabled:opacity-50"
+                                variant="ghost"
+                                size="sm"
+                                className="hover:text-emerald-600 text-xs font-semibold"
                               >
                                 Save
-                              </button>
-                              <button onClick={() => setEditingId(null)} className="hover:text-text-primary text-xs font-semibold">
+                              </Button>
+                              <Button onClick={() => setEditingId(null)} variant="ghost" size="sm" className="hover:text-text-primary text-xs font-semibold">
                                 Cancel
-                              </button>
+                              </Button>
                             </>
                           ) : (
                             <>
-                              <button
+                              <Button
                                 onClick={() => handleStartEdit(kw.id, kw.keyword, kw.keywordType)}
+                                variant="ghost"
+                                size="icon"
                                 className="hover:text-text-primary"
                               >
                                 <Edit3 size={16} strokeWidth={1.5} />
-                              </button>
-                              <button onClick={() => handleDeleteKeyword(kw.id)} className="hover:text-red-500">
+                              </Button>
+                              <Button onClick={() => handleDeleteKeyword(kw.id)} variant="ghost" size="icon" className="hover:text-red-500">
                                 <Trash2 size={16} strokeWidth={1.5} />
-                              </button>
+                              </Button>
                             </>
                           )}
                         </div>

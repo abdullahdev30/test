@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useEffect, useMemo, useState, useTransition } from 'react';
-import { Save, Loader2, Trash2 } from 'lucide-react';
+import { Save, Trash2 } from 'lucide-react';
 import { useWorkspace } from '@/hooks/useWorkspace';
 import { useRouter } from 'next/navigation';
+import { Alert, Button, Card, Checkbox, Input, Textarea } from '@/components/common';
 
 type ProfileForm = {
   businessName: string;
@@ -87,6 +88,7 @@ export default function ProfileSettingsPage() {
 
   useEffect(() => {
     if (!businessProfile) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset form when profile is not yet loaded
       setForm(EMPTY_FORM);
       return;
     }
@@ -198,24 +200,25 @@ export default function ProfileSettingsPage() {
           <h2 className="text-xl font-semibold text-text-primary">Business Profile</h2>
           <p className="text-sm text-text-secondary mt-1">Manage standard identity and content strategy defaults.</p>
         </div>
-        <button
+        <Button
           onClick={handleSave}
           disabled={isSaving || isLoading}
-          className="flex items-center gap-2 px-6 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
+          isLoading={isSaving}
+          className="gap-2 px-6 py-2 rounded-lg text-sm font-semibold"
         >
-          {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Save Changes
-        </button>
+          <Save size={16} /> Save Changes
+        </Button>
       </div>
 
       {error && (
-        <div className="mb-4 px-3 py-2 text-xs rounded-lg bg-red-500/10 border border-red-500/20 text-red-600">
+        <Alert variant="alert" className="mb-4 text-xs">
           {error}
-        </div>
+        </Alert>
       )}
       {success && (
-        <div className="mb-4 px-3 py-2 text-xs rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600">
+        <Alert variant="success" className="mb-4 text-xs">
           {success}
-        </div>
+        </Alert>
       )}
 
       <div className="space-y-12">
@@ -228,61 +231,67 @@ export default function ProfileSettingsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-2">
               <label className="text-xs font-semibold text-text-primary">Business Name</label>
-              <input
+              <Input
                 value={form.businessName}
                 onChange={(e) => setForm((prev) => ({ ...prev, businessName: e.target.value }))}
-                className="w-full p-3 bg-background border border-text-secondary/10 rounded-lg text-sm text-text-primary focus:outline-none focus:border-primary"
+                className="border-text-secondary/10 rounded-lg"
+                variant="filled"
                 placeholder="Your business name"
               />
             </div>
 
             <div className="space-y-2">
               <label className="text-xs font-semibold text-text-primary">Brand Slug</label>
-              <input
+              <Input
                 value={form.brandSlug}
                 onChange={(e) => setForm((prev) => ({ ...prev, brandSlug: e.target.value }))}
-                className="w-full p-3 bg-background border border-text-secondary/10 rounded-lg text-sm text-text-primary focus:outline-none focus:border-primary"
+                className="border-text-secondary/10 rounded-lg"
+                variant="filled"
                 placeholder="flowsync-automation"
               />
             </div>
 
             <div className="space-y-2">
               <label className="text-xs font-semibold text-text-primary">Industry</label>
-              <input
+              <Input
                 value={form.industry}
                 onChange={(e) => setForm((prev) => ({ ...prev, industry: e.target.value }))}
-                className="w-full p-3 bg-background border border-text-secondary/10 rounded-lg text-sm text-text-primary focus:outline-none focus:border-primary"
+                className="border-text-secondary/10 rounded-lg"
+                variant="filled"
                 placeholder="Technology"
               />
             </div>
 
             <div className="space-y-2">
               <label className="text-xs font-semibold text-text-primary">Category</label>
-              <input
+              <Input
                 value={form.category}
                 onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
-                className="w-full p-3 bg-background border border-text-secondary/10 rounded-lg text-sm text-text-primary focus:outline-none focus:border-primary"
+                className="border-text-secondary/10 rounded-lg"
+                variant="filled"
                 placeholder="Software"
               />
             </div>
 
             <div className="space-y-2 md:col-span-2">
               <label className="text-xs font-semibold text-text-primary">Subcategory</label>
-              <input
+              <Input
                 value={form.subcategory}
                 onChange={(e) => setForm((prev) => ({ ...prev, subcategory: e.target.value }))}
-                className="w-full p-3 bg-background border border-text-secondary/10 rounded-lg text-sm text-text-primary focus:outline-none focus:border-primary"
+                className="border-text-secondary/10 rounded-lg"
+                variant="filled"
                 placeholder="Automation & Workflow Orchestration"
               />
             </div>
 
             <div className="space-y-2 md:col-span-2">
               <label className="text-xs font-semibold text-text-primary">Description</label>
-              <textarea
+              <Textarea
                 rows={4}
                 value={form.description}
                 onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-                className="w-full p-4 bg-background border border-text-secondary/10 rounded-lg text-sm text-text-primary focus:outline-none focus:border-primary resize-none"
+                className="border-text-secondary/10 rounded-lg min-h-[120px] resize-none"
+                variant="filled"
                 placeholder="Describe your business profile..."
               />
             </div>
@@ -300,40 +309,44 @@ export default function ProfileSettingsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-2">
               <label className="text-xs font-semibold text-text-primary">Website URL</label>
-              <input
+              <Input
                 value={form.websiteUrl}
                 onChange={(e) => setForm((prev) => ({ ...prev, websiteUrl: e.target.value }))}
-                className="w-full p-3 bg-background border border-text-secondary/10 rounded-lg text-sm text-text-primary focus:outline-none focus:border-primary"
+                className="border-text-secondary/10 rounded-lg"
+                variant="filled"
                 placeholder="https://www.flowsyncautomation.com"
               />
             </div>
 
             <div className="space-y-2">
               <label className="text-xs font-semibold text-text-primary">Country</label>
-              <input
+              <Input
                 value={form.country}
                 onChange={(e) => setForm((prev) => ({ ...prev, country: e.target.value }))}
-                className="w-full p-3 bg-background border border-text-secondary/10 rounded-lg text-sm text-text-primary focus:outline-none focus:border-primary"
+                className="border-text-secondary/10 rounded-lg"
+                variant="filled"
                 placeholder="United States"
               />
             </div>
 
             <div className="space-y-2">
               <label className="text-xs font-semibold text-text-primary">City</label>
-              <input
+              <Input
                 value={form.city}
                 onChange={(e) => setForm((prev) => ({ ...prev, city: e.target.value }))}
-                className="w-full p-3 bg-background border border-text-secondary/10 rounded-lg text-sm text-text-primary focus:outline-none focus:border-primary"
+                className="border-text-secondary/10 rounded-lg"
+                variant="filled"
                 placeholder="Miami"
               />
             </div>
 
             <div className="space-y-2">
               <label className="text-xs font-semibold text-text-primary">Timezone</label>
-              <input
+              <Input
                 value={form.timezone}
                 onChange={(e) => setForm((prev) => ({ ...prev, timezone: e.target.value }))}
-                className="w-full p-3 bg-background border border-text-secondary/10 rounded-lg text-sm text-text-primary focus:outline-none focus:border-primary"
+                className="border-text-secondary/10 rounded-lg"
+                variant="filled"
                 placeholder="EST"
               />
             </div>
@@ -351,30 +364,33 @@ export default function ProfileSettingsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-2">
               <label className="text-xs font-semibold text-text-primary">Default Language</label>
-              <input
+              <Input
                 value={form.defaultLanguage}
                 onChange={(e) => setForm((prev) => ({ ...prev, defaultLanguage: e.target.value }))}
-                className="w-full p-3 bg-background border border-text-secondary/10 rounded-lg text-sm text-text-primary focus:outline-none focus:border-primary"
+                className="border-text-secondary/10 rounded-lg"
+                variant="filled"
                 placeholder="English"
               />
             </div>
 
             <div className="space-y-2">
               <label className="text-xs font-semibold text-text-primary">Brand Tone</label>
-              <input
+              <Input
                 value={form.brandTone}
                 onChange={(e) => setForm((prev) => ({ ...prev, brandTone: e.target.value }))}
-                className="w-full p-3 bg-background border border-text-secondary/10 rounded-lg text-sm text-text-primary focus:outline-none focus:border-primary"
+                className="border-text-secondary/10 rounded-lg"
+                variant="filled"
                 placeholder="Professional, clear, and solution-oriented"
               />
             </div>
 
             <div className="space-y-2">
               <label className="text-xs font-semibold text-text-primary">Posting Frequency</label>
-              <input
+              <Input
                 value={form.postingFrequency}
                 onChange={(e) => setForm((prev) => ({ ...prev, postingFrequency: e.target.value }))}
-                className="w-full p-3 bg-background border border-text-secondary/10 rounded-lg text-sm text-text-primary focus:outline-none focus:border-primary"
+                className="border-text-secondary/10 rounded-lg"
+                variant="filled"
                 placeholder="daily"
               />
             </div>
@@ -382,13 +398,11 @@ export default function ProfileSettingsPage() {
             <div className="space-y-2">
               <label className="text-xs font-semibold text-text-primary">Approval Required</label>
               <label className="flex items-center gap-3 px-3 py-3 bg-background border border-text-secondary/10 rounded-lg text-sm text-text-primary cursor-pointer">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={form.approvalRequired}
                   onChange={(e) =>
                     setForm((prev) => ({ ...prev, approvalRequired: e.target.checked }))
                   }
-                  className="w-4 h-4 accent-primary"
                 />
                 Require approval before posting
               </label>
@@ -396,22 +410,24 @@ export default function ProfileSettingsPage() {
 
             <div className="space-y-2">
               <label className="text-xs font-semibold text-text-primary">Target Audience</label>
-              <textarea
+              <Textarea
                 rows={4}
                 value={form.targetAudience}
                 onChange={(e) => setForm((prev) => ({ ...prev, targetAudience: e.target.value }))}
-                className="w-full p-4 bg-background border border-text-secondary/10 rounded-lg text-sm text-text-primary focus:outline-none focus:border-primary resize-none"
+                className="border-text-secondary/10 rounded-lg min-h-[120px] resize-none"
+                variant="filled"
                 placeholder="Small to mid-sized businesses, startups, and enterprises..."
               />
             </div>
 
             <div className="space-y-2">
               <label className="text-xs font-semibold text-text-primary">Services</label>
-              <textarea
+              <Textarea
                 rows={4}
                 value={form.servicesText}
                 onChange={(e) => setForm((prev) => ({ ...prev, servicesText: e.target.value }))}
-                className="w-full p-4 bg-background border border-text-secondary/10 rounded-lg text-sm text-text-primary focus:outline-none focus:border-primary resize-none"
+                className="border-text-secondary/10 rounded-lg min-h-[120px] resize-none"
+                variant="filled"
                 placeholder={"One per line or comma separated\nWorkflow automation\nAPI integration"}
               />
               <p className="text-[11px] text-text-secondary">{parsedServices.length} services detected</p>
@@ -419,11 +435,12 @@ export default function ProfileSettingsPage() {
 
             <div className="space-y-2">
               <label className="text-xs font-semibold text-text-primary">Goals</label>
-              <textarea
+              <Textarea
                 rows={4}
                 value={form.goalsText}
                 onChange={(e) => setForm((prev) => ({ ...prev, goalsText: e.target.value }))}
-                className="w-full p-4 bg-background border border-text-secondary/10 rounded-lg text-sm text-text-primary focus:outline-none focus:border-primary resize-none"
+                className="border-text-secondary/10 rounded-lg min-h-[120px] resize-none"
+                variant="filled"
                 placeholder={"One per line or comma separated\nSimplify complex workflows"}
               />
               <p className="text-[11px] text-text-secondary">{parsedGoals.length} goals detected</p>
@@ -431,13 +448,14 @@ export default function ProfileSettingsPage() {
 
             <div className="space-y-2">
               <label className="text-xs font-semibold text-text-primary">Preferred Platforms</label>
-              <textarea
+              <Textarea
                 rows={4}
                 value={form.preferredPlatformsText}
                 onChange={(e) =>
                   setForm((prev) => ({ ...prev, preferredPlatformsText: e.target.value }))
                 }
-                className="w-full p-4 bg-background border border-text-secondary/10 rounded-lg text-sm text-text-primary focus:outline-none focus:border-primary resize-none"
+                className="border-text-secondary/10 rounded-lg min-h-[120px] resize-none"
+                variant="filled"
                 placeholder={"One per line or comma separated\nLinkedIn\nTwitter\nGBP"}
               />
               <p className="text-[11px] text-text-secondary">
@@ -458,50 +476,50 @@ export default function ProfileSettingsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-2">
               <label className="text-xs font-semibold text-text-primary">Profile Id</label>
-              <input
+              <Input
                 readOnly
                 value={String(businessProfile?.id ?? '')}
-                className="w-full p-3 bg-bg-primary border border-text-secondary/10 rounded-lg text-sm text-text-secondary"
+                className="bg-bg-primary border-text-secondary/10 rounded-lg text-text-secondary"
               />
             </div>
             <div className="space-y-2">
               <label className="text-xs font-semibold text-text-primary">Workspace Id</label>
-              <input
+              <Input
                 readOnly
                 value={String(businessProfile?.workspaceId ?? '')}
-                className="w-full p-3 bg-bg-primary border border-text-secondary/10 rounded-lg text-sm text-text-secondary"
+                className="bg-bg-primary border-text-secondary/10 rounded-lg text-text-secondary"
               />
             </div>
             <div className="space-y-2">
               <label className="text-xs font-semibold text-text-primary">Onboarding Completed</label>
-              <input
+              <Input
                 readOnly
                 value={businessProfile?.onboardingCompleted ? 'Yes' : 'No'}
-                className="w-full p-3 bg-bg-primary border border-text-secondary/10 rounded-lg text-sm text-text-secondary"
+                className="bg-bg-primary border-text-secondary/10 rounded-lg text-text-secondary"
               />
             </div>
             <div className="space-y-2">
               <label className="text-xs font-semibold text-text-primary">Onboarding Completed At</label>
-              <input
+              <Input
                 readOnly
                 value={formatDate(businessProfile?.onboardingCompletedAt)}
-                className="w-full p-3 bg-bg-primary border border-text-secondary/10 rounded-lg text-sm text-text-secondary"
+                className="bg-bg-primary border-text-secondary/10 rounded-lg text-text-secondary"
               />
             </div>
             <div className="space-y-2">
               <label className="text-xs font-semibold text-text-primary">Created At</label>
-              <input
+              <Input
                 readOnly
                 value={formatDate(businessProfile?.createdAt)}
-                className="w-full p-3 bg-bg-primary border border-text-secondary/10 rounded-lg text-sm text-text-secondary"
+                className="bg-bg-primary border-text-secondary/10 rounded-lg text-text-secondary"
               />
             </div>
             <div className="space-y-2">
               <label className="text-xs font-semibold text-text-primary">Updated At</label>
-              <input
+              <Input
                 readOnly
                 value={formatDate(businessProfile?.updatedAt)}
-                className="w-full p-3 bg-bg-primary border border-text-secondary/10 rounded-lg text-sm text-text-secondary"
+                className="bg-bg-primary border-text-secondary/10 rounded-lg text-text-secondary"
               />
             </div>
           </div>
@@ -509,22 +527,24 @@ export default function ProfileSettingsPage() {
 
         <hr className="border-text-secondary/10" />
 
-        <section className="rounded-xl border border-red-500/30 bg-red-500/5 p-6">
+        <Card className="rounded-xl border-red-500/30 bg-red-500/5 p-6">
           <div className="mb-5">
             <h3 className="text-sm font-bold text-red-600 uppercase tracking-wider">Danger Zone</h3>
             <p className="text-xs text-text-secondary mt-1">
               Deleting the workspace will remove its profile and related workspace data.
             </p>
           </div>
-          <button
+          <Button
             onClick={handleDeleteWorkspace}
             disabled={isDeleting || isLoading}
-            className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors disabled:opacity-50"
+            variant="alert"
+            isLoading={isDeleting}
+            className="inline-flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold"
           >
-            {isDeleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+            <Trash2 size={16} />
             Delete Workspace
-          </button>
-        </section>
+          </Button>
+        </Card>
       </div>
     </div>
   );

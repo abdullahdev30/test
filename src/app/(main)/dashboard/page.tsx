@@ -5,6 +5,7 @@ import { useMemo, type ReactNode } from 'react';
 import { BarChart3, CalendarClock, CheckCircle2, Clock3, FileText, Plus, ShieldAlert } from 'lucide-react';
 import { usePosts } from '@/hooks/usePosts';
 import type { PostItem } from '@/lib/api/posts';
+import { Alert, Card } from '@/components/common';
 
 function normalize(value?: string | null): string {
   return (value ?? '').toLowerCase();
@@ -103,7 +104,7 @@ export default function DashboardPage() {
     <div className="p-6 lg:p-10 max-w-[1450px] mx-auto min-h-screen">
       <div className="mb-8 flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-black text-text-primary tracking-tight">Automation Dashboard</h1>
+          <h1 className="text-4xl font-black text-text-primary tracking-tight"> Dashboard</h1>
           <p className="text-text-secondary mt-2 font-medium">
             Monitor automation volume, approvals, and next scheduled posts.
           </p>
@@ -127,10 +128,10 @@ export default function DashboardPage() {
       </div>
 
       {(isLoading || error) && (
-        <div className="mb-6 rounded-2xl border border-text-secondary/10 bg-bg-primary px-4 py-3 text-sm font-medium">
+        <Alert variant={error ? 'alert' : 'default'} className="mb-6">
           {isLoading && <p className="text-text-secondary">Loading automation data...</p>}
-          {error && <p className="text-red-600">{error}</p>}
-        </div>
+          {error && <p>{error}</p>}
+        </Alert>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
@@ -141,7 +142,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] gap-6">
-        <div className="bg-bg-primary rounded-[28px] border border-text-secondary/10 p-6">
+        <Card className="rounded-[28px] p-6">
           <h2 className="text-xl font-black text-text-primary mb-4">Status Split</h2>
           <div className="space-y-3">
             {statusChart.map((item) => (
@@ -161,16 +162,16 @@ export default function DashboardPage() {
           <div className="space-y-3">
             {sourceChart.length === 0 && <p className="text-sm text-text-secondary">No source data available.</p>}
             {sourceChart.map((item) => (
-              <div key={item.label} className="rounded-xl border border-text-secondary/10 p-3">
+              <Card key={item.label} className="rounded-xl p-3">
                 <p className="text-sm font-bold text-text-primary">{item.label}</p>
                 <p className="text-xs text-text-secondary mt-1">{item.value} posts ({item.percent}%)</p>
-              </div>
+              </Card>
             ))}
           </div>
-        </div>
+        </Card>
 
         <div className="space-y-6">
-          <div className="bg-bg-primary rounded-[28px] border border-text-secondary/10 p-5">
+          <Card className="rounded-[28px] p-5">
             <h2 className="text-lg font-black text-text-primary mb-4">Next 3 Upcoming Posts</h2>
             {metrics.upcoming.length === 0 ? (
               <p className="text-sm text-text-secondary">No upcoming posts found.</p>
@@ -192,7 +193,7 @@ export default function DashboardPage() {
                 ))}
               </div>
             )}
-          </div>
+          </Card>
 
         </div>
       </div>
@@ -202,12 +203,12 @@ export default function DashboardPage() {
 
 function MetricCard({ title, value, icon }: { title: string; value: number; icon: ReactNode }) {
   return (
-    <article className="bg-bg-primary rounded-2xl border border-text-secondary/10 p-4">
+    <Card className="rounded-2xl p-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xs font-bold uppercase tracking-wide text-text-secondary">{title}</h2>
         <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">{icon}</div>
       </div>
       <p className="text-3xl font-black text-text-primary mt-2">{value}</p>
-    </article>
+    </Card>
   );
 }

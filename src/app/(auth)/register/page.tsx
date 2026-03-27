@@ -6,9 +6,10 @@ import { FcGoogle } from "react-icons/fc";
 import {
   Mail, Lock, ArrowRight, CheckCircle2,
   ShieldCheck, RefreshCw, ChevronLeft, Globe2,
-  Loader2, Eye, EyeOff
+  Eye, EyeOff
 } from 'lucide-react';
 import { signup, verifyEmail, resendVerification } from '@/lib/api/auth';
+import { Alert, Button, Card, Input, Select } from '@/components/common';
 
 const GOOGLE_OAUTH_START_URL = "/api/auth/google";
 const FALLBACK_TIMEZONES = [
@@ -130,12 +131,12 @@ const SignupFlow = () => {
 
   return (
     <section className="min-h-screen flex items-center justify-center bg-background p-4 text-txt-primary">
-      <div className="w-full max-w-md bg-bg-primary rounded-3xl shadow-sm border border-background p-8 md:p-10 z-10">
+      <Card className="w-full max-w-md rounded-3xl border-background p-8 md:p-10 z-10 shadow-sm">
 
         {error && (
-          <div className="mb-4 p-3 bg-red-500/10 text-red-500 rounded-xl text-sm font-bold border border-red-500/20 text-center">
+          <Alert variant="alert" className="mb-4 text-center">
             {error}
-          </div>
+          </Alert>
         )}
 
         {step === 'form' && (
@@ -147,37 +148,39 @@ const SignupFlow = () => {
 
             <form className="space-y-4" onSubmit={handleSignup}>
               <div className="grid grid-cols-2 gap-3">
-                <input
+                <Input
                   name="firstName" placeholder="First Name" required
                   onChange={handleChange}
                   autoComplete="given-name"
-                  className="w-full px-4 py-3 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary"
+                  className="rounded-2xl"
+                  variant="filled"
                 />
-                <input
+                <Input
                   name="lastName" placeholder="Last Name" required
                   onChange={handleChange}
                   autoComplete="family-name"
-                  className="w-full px-4 py-3 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary"
+                  className="rounded-2xl"
+                  variant="filled"
                 />
               </div>
 
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-txt-secondary" />
-                <input
-                  name="email" type="email" placeholder="Email Address" required
-                  onChange={handleChange}
-                  autoComplete="email"
-                  className="w-full pl-12 pr-4 py-3 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
+              <Input
+                name="email" type="email" placeholder="Email Address" required
+                onChange={handleChange}
+                autoComplete="email"
+                className="rounded-2xl"
+                variant="filled"
+                leftIcon={<Mail className="w-5 h-5" />}
+              />
 
               <div className="relative">
-                <Globe2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-txt-secondary pointer-events-none" />
-                <select
+                <Globe2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-txt-secondary pointer-events-none z-10" />
+                <Select
                   name="timezone"
                   value={formData.timezone}
                   onChange={handleChange}
-                  className="w-full pl-12 pr-4 py-3 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary"
+                  className="rounded-2xl pl-12"
+                  variant="filled"
                   required
                 >
                   {timezoneOptions.map((timezone) => (
@@ -185,47 +188,50 @@ const SignupFlow = () => {
                       {timezone}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
 
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-txt-secondary" />
-                <input
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Password (min 8 chars)" required
-                  onChange={handleChange}
-                  autoComplete="new-password"
-                  className="w-full pl-12 pr-12 py-3 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-txt-secondary hover:text-primary"
-                >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
-              </div>
+              <Input
+                name="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Password (min 8 chars)" required
+                onChange={handleChange}
+                autoComplete="new-password"
+                className="rounded-2xl"
+                variant="filled"
+                leftIcon={<Lock className="w-5 h-5" />}
+                rightNode={
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="text-txt-secondary hover:text-primary"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                }
+              />
 
-              <div className="relative">
-                <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-txt-secondary" />
-                <input
-                  name="confirmPassword"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Confirm Password" required
-                  onChange={handleChange}
-                  autoComplete="new-password"
-                  className="w-full pl-12 pr-4 py-3 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
+              <Input
+                name="confirmPassword"
+                type={showPassword ? "text" : "password"}
+                placeholder="Confirm Password" required
+                onChange={handleChange}
+                autoComplete="new-password"
+                className="rounded-2xl"
+                variant="filled"
+                leftIcon={<ShieldCheck className="w-5 h-5" />}
+              />
 
-              <button
+              <Button
                 disabled={isPending}
                 type="submit"
-                className="w-full bg-primary hover:bg-[#6D28D9] text-white font-semibold py-4 rounded-2xl flex items-center justify-center transition-all active:scale-[0.98]"
+                isLoading={isPending}
+                className="w-full py-4 rounded-2xl"
+                rightIcon={!isPending ? <ArrowRight className="w-5 h-5" /> : undefined}
               >
-                {isPending ? <Loader2 className="animate-spin" /> : <>Sign Up <ArrowRight className="ml-2 w-5 h-5" /></>}
-              </button>
+                Sign Up
+              </Button>
             </form>
 
             <div className="relative flex py-6 items-center">
@@ -234,14 +240,15 @@ const SignupFlow = () => {
               <div className="flex-grow border-t border-txt-secondary/20"></div>
             </div>
 
-            <button
+            <Button
               type="button"
               onClick={handleGoogleLogin}
-              className="w-full flex items-center justify-center gap-3 py-3 px-4 border rounded-xl font-medium text-txt-primary hover:bg-background"
+              variant="outline"
+              className="w-full py-3 px-4 rounded-xl font-medium text-txt-primary"
             >
               <FcGoogle className="w-6 h-6" />
               <span>Continue with Google</span>
-            </button>
+            </Button>
 
             <p className="mt-6 text-center text-sm text-txt-secondary">
               Already have an account?{" "}
@@ -252,32 +259,35 @@ const SignupFlow = () => {
 
         {step === 'otp' && (
           <div className="animate-in fade-in zoom-in-95 duration-500 space-y-6">
-            <button onClick={() => setStep('form')} className="flex items-center text-txt-secondary text-sm">
+            <Button onClick={() => setStep('form')} variant="ghost" size="sm" className="text-txt-secondary text-sm px-0">
               <ChevronLeft className="w-4 h-4 mr-1" /> Back
-            </button>
+            </Button>
             <div className="text-center">
               <ShieldCheck className="w-12 h-12 text-primary mx-auto mb-4" />
               <h2 className="text-2xl font-bold">Verify Email</h2>
               <p className="text-txt-secondary text-sm mt-2">Code sent to <b>{formData.email}</b></p>
             </div>
             <form onSubmit={handleVerify} className="space-y-6">
-              <input
+              <Input
                 type="text" maxLength={6} value={otp} required placeholder="000000"
                 onChange={(e) => setOtp(e.target.value)}
-                className="w-full text-center text-4xl tracking-[0.5rem] font-bold py-5 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary"
+                className="text-center text-4xl tracking-[0.5rem] font-bold py-5 rounded-2xl"
+                variant="filled"
               />
-              <button disabled={isPending} type="submit" className="w-full bg-primary text-white font-bold py-4 rounded-2xl transition-all">
-                {isPending ? <Loader2 className="animate-spin mx-auto" /> : "Verify & Continue"}
-              </button>
+              <Button disabled={isPending} isLoading={isPending} type="submit" className="w-full py-4 rounded-2xl">
+                Verify & Continue
+              </Button>
             </form>
-            <button
+            <Button
               onClick={handleResend}
               disabled={resendTimer > 0 || isPending}
-              className={`flex items-center mx-auto font-bold text-sm ${resendTimer > 0 ? 'text-txt-secondary' : 'text-primary'}`}
+              variant="ghost"
+              size="sm"
+              className={`mx-auto font-bold text-sm ${resendTimer > 0 ? 'text-txt-secondary' : 'text-primary'}`}
             >
               <RefreshCw className={`w-4 h-4 mr-2 ${resendTimer > 0 ? '' : 'animate-pulse'}`} />
               {resendTimer > 0 ? `Resend in ${resendTimer}s` : "Resend Code"}
-            </button>
+            </Button>
           </div>
         )}
 
@@ -286,15 +296,15 @@ const SignupFlow = () => {
             <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-6" />
             <h1 className="text-3xl font-bold mb-2">Verified!</h1>
             <p className="text-txt-secondary mb-8 leading-relaxed">Your account is ready.</p>
-            <button
+            <Button
               onClick={() => router.push('/dashboard')}
-              className="w-full bg-txt-primary text-bg-primary font-bold py-4 rounded-2xl hover:opacity-90"
+              className="w-full bg-txt-primary text-bg-primary rounded-2xl py-4 hover:opacity-90"
             >
               Go to Dashboard
-            </button>
+            </Button>
           </div>
         )}
-      </div>
+      </Card>
     </section>
   );
 };

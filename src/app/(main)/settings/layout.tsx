@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { User, Shield, Factory } from 'lucide-react';
+import { Card } from '@/components/common';
 
 const navLinks = [
   { label: "Profile", href: "/settings/profile", icon: User },
@@ -24,7 +25,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
       <div className="flex flex-col md:flex-row gap-10">
         {/* Left Nav */}
         <div className="w-full md:w-64 flex-shrink-0">
-          <nav className="space-y-2 bg-bg-primary border border-text-secondary/10 p-3 rounded-[32px] shadow-sm">
+          <Card className="space-y-2 p-3 rounded-[32px] shadow-sm">
             {navLinks.map((item) => {
               const isActive = pathname === item.href;
               return (
@@ -41,7 +42,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
                 </Link>
               );
             })}
-          </nav>
+          </Card>
         </div>
 
         {/* Main Content */}

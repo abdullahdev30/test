@@ -4,10 +4,11 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Calendar, Briefcase,
-  Settings, LogOut, ChevronLeft, ChevronRight, Loader2, Link2, FileText
+  Settings, LogOut, ChevronLeft, ChevronRight, Link2, FileText
 } from 'lucide-react';
 import { useUser } from '@/hooks/useUser';
 import { logout } from '@/lib/api/auth';
+import { Button, Spinner } from './common';
 
 const menuItems = [
   { name: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
@@ -27,13 +28,12 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
   const handleLogout = () => {
     startTransition(async () => {
       await logout();
-      // Hard redirect so middleware clears protected page state
       window.location.href = '/login';
     });
   };
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-bg-primary">
+    <div className="flex h-screen w-full overflow-visible bg-bg-primary">
       <aside
         className={`h-screen flex flex-col bg-bg-primary flex-shrink-0 transition-all duration-300 relative ${isCollapsed ? 'w-[88px]' : 'w-[288px]'}`}
         style={{
@@ -41,12 +41,13 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
           borderRight: '1px solid rgba(0,0,0,0.1)'
         }}
       >
-        <button
+        <Button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="absolute right-0 top-8 w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center shadow-md hover:scale-110 transition-transform z-10"
+          size='icon'
+          className="absolute -right-4 top-20  rounded-full shadow-md hover:scale-110 transition-transform z-0 p-0"
         >
           {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-        </button>
+        </Button>
 
         <div className={`flex flex-col h-full ${isCollapsed ? 'p-4 items-center' : 'p-6'}`}>
           <Link href="/dashboard" className={`flex items-center gap-3 mb-10 ${isCollapsed ? 'justify-center' : ''}`}>
@@ -101,13 +102,15 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
                 </div>
               )}
             </Link>
-            <button
+            <Button
               onClick={handleLogout}
               disabled={isPending}
-              className={`text-text-secondary hover:text-red-500 transition-colors ${isCollapsed ? 'bg-background rounded-xl w-10 h-10 flex items-center justify-center border border-text-secondary/10' : 'p-2'}`}
+              variant={isCollapsed ? 'outline' : 'ghost'}
+              size="icon"
+              className={`text-text-secondary hover:text-red-500 ${isCollapsed ? 'bg-background rounded-xl w-10 h-10 border border-text-secondary/10' : ''}`}
             >
-              {isPending ? <Loader2 size={20} className="animate-spin" /> : <LogOut size={20} />}
-            </button>
+              {isPending ? <Spinner size="md" /> : <LogOut size={20} />}
+            </Button>
           </div>
         </div>
       </aside>

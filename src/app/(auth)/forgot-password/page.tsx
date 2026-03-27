@@ -3,6 +3,7 @@ import React, { useState, useRef, useTransition } from 'react';
 import { Mail, ArrowLeft, KeyRound, ShieldCheck, Lock, Eye, EyeOff } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { forgotPassword, verifyResetOtp, resetPassword } from '@/lib/api/auth';
+import { Alert, Button, Card, Input } from '@/components/common';
 
 export default function ForgotPassword() {
   const router = useRouter();
@@ -78,7 +79,7 @@ export default function ForgotPassword() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
-      <div className="w-full max-w-[440px] bg-bg-primary rounded-[32px] p-8 md:p-10 shadow-2xl border border-background">
+      <Card className="w-full max-w-[440px] rounded-[32px] p-8 md:p-10 shadow-2xl border-background">
 
         <div className="text-center mb-8">
           <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -95,26 +96,25 @@ export default function ForgotPassword() {
         </div>
 
         {error && (
-          <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl text-xs font-bold text-center">
+          <Alert variant="alert" className="mb-6 text-center text-xs font-bold">
             {error}
-          </div>
+          </Alert>
         )}
 
         {step === 'email' && (
           <form onSubmit={handleSendReset} className="space-y-5">
-            <div className="relative">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-txt-secondary w-5 h-5" />
-              <input
-                type="email" required value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                autoComplete="email"
-                className="w-full pl-12 pr-4 py-3.5 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary text-txt-primary"
-                placeholder="Enter email"
-              />
-            </div>
-            <button type="submit" disabled={isPending} className="w-full bg-primary text-white font-bold py-4 rounded-2xl hover:opacity-90">
-              {isPending ? "Sending..." : "Continue"}
-            </button>
+            <Input
+              type="email" required value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              className="rounded-2xl py-3.5 text-txt-primary"
+              placeholder="Enter email"
+              variant="filled"
+              leftIcon={<Mail className="w-5 h-5" />}
+            />
+            <Button type="submit" disabled={isPending} isLoading={isPending} className="w-full py-4 rounded-2xl">
+              Continue
+            </Button>
           </form>
         )}
 
@@ -122,58 +122,63 @@ export default function ForgotPassword() {
           <form onSubmit={handleVerifyOtp} className="space-y-6">
             <div className="flex justify-between gap-2">
               {otp.map((digit, idx) => (
-                <input
+                <Input
                   key={idx}
                   ref={(el) => { inputRefs.current[idx] = el; }}
                   type="text" maxLength={1} value={digit}
                   onChange={(e) => handleOtpChange(e.target.value, idx)}
-                  className="w-full h-14 text-center text-xl font-bold bg-background border border-bg-primary rounded-xl text-txt-primary focus:ring-2 focus:ring-primary outline-none"
+                  className="h-14 text-center text-xl font-bold rounded-xl text-txt-primary"
+                  variant="filled"
                 />
               ))}
             </div>
-            <button type="submit" disabled={isPending} className="w-full bg-primary text-white font-bold py-4 rounded-2xl">
-              {isPending ? "Verifying..." : "Verify Code"}
-            </button>
+            <Button type="submit" disabled={isPending} isLoading={isPending} className="w-full py-4 rounded-2xl">
+              Verify Code
+            </Button>
           </form>
         )}
 
         {step === 'password' && (
           <form onSubmit={handleFinalReset} className="space-y-4">
-            <div className="relative">
-              <input
-                type={showPass ? "text" : "password"}
-                placeholder="New Password (min 8 chars)"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                autoComplete="new-password"
-                className="w-full px-4 pr-12 py-3.5 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary text-txt-primary"
-                required
-              />
-              <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-4 top-1/2 -translate-y-1/2 text-txt-secondary">
-                {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-            <input
+            <Input
+              type={showPass ? "text" : "password"}
+              placeholder="New Password (min 8 chars)"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              autoComplete="new-password"
+              className="rounded-2xl py-3.5 text-txt-primary"
+              required
+              variant="filled"
+              rightNode={
+                <button type="button" onClick={() => setShowPass(!showPass)} className="text-txt-secondary" aria-label={showPass ? "Hide password" : "Show password"}>
+                  {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              }
+            />
+            <Input
               type="password" placeholder="Confirm Password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               autoComplete="new-password"
-              className="w-full px-4 py-3.5 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary text-txt-primary"
+              className="rounded-2xl py-3.5 text-txt-primary"
               required
+              variant="filled"
             />
-            <button type="submit" disabled={isPending} className="w-full bg-primary text-white font-bold py-4 rounded-2xl">
-              {isPending ? "Resetting..." : "Reset Password"}
-            </button>
+            <Button type="submit" disabled={isPending} isLoading={isPending} className="w-full py-4 rounded-2xl">
+              Reset Password
+            </Button>
           </form>
         )}
 
-        <button
+        <Button
           onClick={() => step === 'email' ? router.push("/login") : setStep('email')}
-          className="mt-8 w-full flex items-center justify-center gap-2 text-xs text-txt-secondary font-bold hover:text-primary transition-colors"
+          variant="ghost"
+          size="sm"
+          className="mt-8 w-full text-xs text-txt-secondary font-bold hover:text-primary"
         >
           <ArrowLeft size={14} /> Back to Login
-        </button>
-      </div>
+        </Button>
+      </Card>
     </div>
   );
 }

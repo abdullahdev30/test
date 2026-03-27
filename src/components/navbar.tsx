@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { Search, Bell, Settings, Menu, X, Sparkles } from "lucide-react";
 import ThemeToggle from "./theme_provider";
+import { Button, Input } from "./common";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -9,7 +10,7 @@ const Navbar = () => {
 
   return (
     <nav 
-      className="relative z-50 backdrop-blur-md"
+      className="relative z-50 backdrop-blur-md "
       style={{
         backgroundColor: 'color-mix(in srgb, var(--bg-primary) 80%, transparent)',
         borderBottom: '1px solid rgba(0,0,0,0.1)',
@@ -27,33 +28,36 @@ const Navbar = () => {
           
           {/* Search */}
           <div className="hidden sm:relative sm:block w-full max-w-[240px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-txt-secondary" size={16} />
-            <input
+            <Input
               type="text"
               placeholder="Command Search..."
-              className="w-full bg-background rounded-full py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary outline-none"
+              className="rounded-full py-2 text-sm"
+              variant="filled"
+              leftIcon={<Search size={16} />}
             />
           </div>
 
           <ThemeToggle />
 
-          <button className="p-2 hover:bg-secondary rounded-full">
+          <Button variant="ghost" size="icon" className="rounded-full">
             <Bell size={20} />
-          </button>
+          </Button>
 
-          <button className="p-2 hover:bg-secondary rounded-full">
+          <Button variant="ghost" size="icon" className="rounded-full">
             <Settings size={20} />
-          </button>
+          </Button>
 
 
 
           {/* Mobile Toggle */}
-          <button
-            className="md:hidden p-2"
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden"
             onClick={() => setIsOpen(true)}
           >
             <Menu size={24} />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -79,9 +83,9 @@ const Navbar = () => {
               <Sparkles className="text-primary" size={24} />
               <span className="font-bold text-xl">SocialAI</span>
             </div>
-            <button onClick={() => setIsOpen(false)}>
+            <Button onClick={() => setIsOpen(false)} variant="ghost" size="icon">
               <X size={24} />
-            </button>
+            </Button>
           </div>
 
 
@@ -89,11 +93,12 @@ const Navbar = () => {
           {/* Mobile Search */}
           <div className="mt-auto pt-6 border-t">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-txt-secondary" size={16} />
-              <input
+              <Input
                 type="text"
                 placeholder="Search..."
-                className="w-full bg-background rounded-lg py-2 pl-10 pr-4 text-sm"
+                className="rounded-lg py-2 text-sm"
+                variant="filled"
+                leftIcon={<Search size={16} />}
               />
             </div>
           </div>

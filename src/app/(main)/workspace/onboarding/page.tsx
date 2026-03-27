@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState, useTransition } from 'react';
-import { Check, Building2, MapPin, Globe, Loader2, Play, AlertCircle } from 'lucide-react';
+import { Check, Building2, MapPin, Globe, Play } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useWorkspace } from '@/hooks/useWorkspace';
+import { Alert, Button, Card, Checkbox, Input, Select } from '@/components/common';
 
 // Auto-generate slug from workspace name
 function slugify(name: string): string {
@@ -102,7 +103,7 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-[calc(100vh-80px)] flex flex-col items-center justify-center p-6 font-sans relative">
-      <div className="bg-bg-primary rounded-lg border border-text-secondary/10 p-10 max-w-2xl w-full shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <Card className="rounded-lg p-10 max-w-2xl w-full shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
 
         {/* Stepper */}
         <div className="flex items-center justify-between mb-12 relative">
@@ -115,19 +116,19 @@ export default function OnboardingPage() {
 
         {/* API Error Banner */}
         {apiError && (
-          <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/20 text-red-600 rounded-lg p-3 mb-6 text-sm">
-            <AlertCircle size={16} className="shrink-0" />
+          <Alert variant="alert" className="mb-6 text-sm">
             {apiError}
-          </div>
+          </Alert>
         )}
 
         <div className="mb-10 min-h-[220px]">
           {step === 1 && (
             <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
-              <h2 className="text-2xl font-semibold text-text-primary tracking-tight mb-2">Welcome! Let's get started.</h2>
+              <h2 className="text-2xl font-semibold text-text-primary tracking-tight mb-2">Welcome! Let&apos;s get started.</h2>
               <p className="text-sm text-text-secondary mb-8">What is the core identity of the workspace?</p>
 
-              <Input icon={<Building2 size={16} />} label="Business Name" placeholder="e.g. Acme Corp"
+              <Input leftIcon={<Building2 size={16} />} containerClassName="mt-4" className="rounded-lg border-text-secondary/10"
+                placeholder="e.g. Acme Corp"
                 value={form.businessName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, businessName: e.target.value })} />
 
               {/* Slug preview */}
@@ -139,10 +140,10 @@ export default function OnboardingPage() {
 
               <div className="w-full mt-4">
                 <label className="block text-xs font-semibold text-text-primary mb-2">Industry / Category</label>
-                <select
+                <Select
                   value={form.industry}
                   onChange={(e) => setForm({ ...form, industry: e.target.value })}
-                  className="w-full px-4 py-3 bg-background border border-text-secondary/10 rounded-lg text-sm focus:outline-none focus:border-primary transition-colors text-text-primary"
+                  className="border-text-secondary/10 rounded-lg"
                 >
                   <option value="" disabled>Select your industry</option>
                   <option value="agency">Marketing Agency</option>
@@ -153,7 +154,7 @@ export default function OnboardingPage() {
                   <option value="healthcare">Healthcare</option>
                   <option value="education">Education</option>
                   <option value="other">Other</option>
-                </select>
+                </Select>
               </div>
             </div>
           )}
@@ -163,21 +164,21 @@ export default function OnboardingPage() {
               <h2 className="text-2xl font-semibold text-text-primary tracking-tight mb-2">Business Presence</h2>
               <p className="text-sm text-text-secondary mb-8">Where can people find your business online and physically?</p>
 
-              <Input icon={<Globe size={16} />} label="Website URL" placeholder="https://example.com"
+              <Input leftIcon={<Globe size={16} />} containerClassName="mt-4" className="rounded-lg border-text-secondary/10" placeholder="https://example.com"
                 value={form.websiteUrl} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, websiteUrl: e.target.value })} />
-              <Input icon={<MapPin size={16} />} label="City" placeholder="e.g. New York"
+              <Input leftIcon={<MapPin size={16} />} containerClassName="mt-4" className="rounded-lg border-text-secondary/10" placeholder="e.g. New York"
                 value={form.city} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, city: e.target.value })} />
-              <Input icon={<MapPin size={16} />} label="Country" placeholder="e.g. USA"
+              <Input leftIcon={<MapPin size={16} />} containerClassName="mt-4" className="rounded-lg border-text-secondary/10" placeholder="e.g. USA"
                 value={form.country} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, country: e.target.value })} />
             </div>
           )}
 
           {step === 3 && (
             <div className="space-y-6 animate-in slide-in-from-right-8 duration-300">
-              <h2 className="text-2xl font-semibold text-text-primary tracking-tight mb-2">You're Almost There!</h2>
+              <h2 className="text-2xl font-semibold text-text-primary tracking-tight mb-2">You&apos;re Almost There!</h2>
               <p className="text-sm text-text-secondary mb-8">Your workspace has been set up. Confirm to launch your dashboard.</p>
 
-              <div className="p-6 bg-secondary border border-text-secondary/10 rounded-lg">
+              <Card variant="soft" className="p-6 rounded-lg">
                 <label className="flex items-center gap-4 cursor-pointer">
                   <div
                     className={`w-6 h-6 rounded border flex items-center justify-center transition-colors ${completeToggle ? 'bg-primary border-primary' : 'border-text-secondary/20 bg-background'}`}
@@ -185,47 +186,48 @@ export default function OnboardingPage() {
                   >
                     {completeToggle && <Check size={14} className="text-white" strokeWidth={3} />}
                   </div>
-                  <input type="checkbox" hidden checked={completeToggle} onChange={(e) => setCompleteToggle(e.target.checked)} />
+                  <Checkbox hidden checked={completeToggle} onChange={(e) => setCompleteToggle(e.target.checked)} />
                   <div>
                     <span className="block text-sm font-semibold text-text-primary">Complete Onboarding</span>
                     <span className="block text-xs text-text-secondary mt-1">I confirm that the core business profile is ready.</span>
                   </div>
                 </label>
-              </div>
+              </Card>
             </div>
           )}
         </div>
 
         <div className="flex items-center justify-between pt-6 border-t border-text-secondary/10">
-          <button
+          <Button
             onClick={() => { setApiError(null); setStep(prev => Math.max(1, prev - 1)); }}
-            className={`px-6 py-2.5 text-sm font-semibold text-text-secondary hover:text-text-primary transition-colors ${step === 1 ? 'opacity-0 pointer-events-none' : ''}`}
+            variant="ghost"
+            className={`px-6 py-2.5 text-sm font-semibold text-text-secondary hover:text-text-primary ${step === 1 ? 'opacity-0 pointer-events-none' : ''}`}
           >
             Back
-          </button>
+          </Button>
 
           {step < 3 ? (
-            <button
+            <Button
               disabled={isSubmitting || (step === 1 && !form.businessName)}
               onClick={handleNext}
-              className="flex items-center gap-2 px-6 py-2.5 bg-text-primary text-background rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
+              isLoading={isSubmitting}
+              className="gap-2 px-6 py-2.5 bg-text-primary text-background rounded-lg text-sm font-semibold hover:opacity-90"
             >
-              {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : null}
               Continue
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
               disabled={!completeToggle || isSubmitting}
               onClick={handleComplete}
-              className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity shadow-sm disabled:opacity-50"
+              className="gap-2 px-6 py-2.5 rounded-lg text-sm font-semibold shadow-sm"
             >
               <Play size={16} />
               Launch Dashboard
-            </button>
+            </Button>
           )}
         </div>
 
-      </div>
+      </Card>
     </div>
   );
 }
@@ -239,23 +241,6 @@ function StepIndicator({ number, label, active }: { number: number; label: strin
       <span className={`text-[11px] font-semibold whitespace-nowrap absolute -bottom-6 ${active ? 'text-primary' : 'text-text-secondary'}`}>
         {label}
       </span>
-    </div>
-  );
-}
-
-function Input({ label, icon, ...props }: { label: string; icon: React.ReactNode } & React.InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <div className="w-full mt-4">
-      <label className="block text-xs font-semibold text-text-primary mb-2">{label}</label>
-      <div className="relative">
-        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary">
-          {icon}
-        </span>
-        <input
-          {...props}
-          className="w-full pl-11 pr-4 py-3 bg-background border border-text-secondary/10 rounded-lg text-sm focus:outline-none focus:border-primary transition-colors text-text-primary"
-        />
-      </div>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Eye, FileText, Flag, Plus, RefreshCw, Send } from 'lucide-react';
 import { usePosts } from '@/hooks/usePosts';
 import type { PostItem } from '@/lib/api/posts';
+import { Alert, Button, Card } from '@/components/common';
 
 type FilterKey = 'all' | 'draft' | 'published' | 'pending' | 'scheduled';
 
@@ -209,23 +210,25 @@ export default function AutomationPage() {
           <p className="text-text-secondary mt-2 font-medium">Live post table with approval and queue actions.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <button
+          <Button
             type="button"
             onClick={() => Promise.all([refreshFromApi(), refreshPendingApprovalFromApi()])}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-text-secondary/20 text-text-secondary hover:text-text-primary hover:border-text-secondary/40 transition-colors font-bold text-sm"
+            variant="outline"
+            className="text-sm"
           >
             <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
             Refresh
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={handleRunDueJobs}
             disabled={isRunningDue}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-300 text-emerald-700 hover:bg-emerald-50 transition-colors font-bold text-sm disabled:opacity-60"
+            variant="outline"
+            className="text-sm border-emerald-300 text-emerald-700 hover:bg-emerald-50"
           >
             <Send size={16} />
             {isRunningDue ? 'Running...' : 'Move Drafts & Publish'}
-          </button>
+          </Button>
           <Link
             href="/posts/new"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-white font-bold hover:opacity-90 transition-opacity text-sm"
@@ -237,27 +240,28 @@ export default function AutomationPage() {
       </div>
 
       {(error || notice) && (
-        <div className="mb-6 rounded-2xl border border-text-secondary/10 bg-bg-primary px-4 py-3 text-sm font-medium">
-          {error && <p className="text-red-600">{error}</p>}
-          {notice && <p className="text-emerald-700">{notice}</p>}
-        </div>
+        <Alert variant={error ? 'alert' : 'success'} className="mb-6">
+          {error || notice}
+        </Alert>
       )}
 
-      <div className="bg-bg-primary rounded-[28px] border border-text-secondary/10 p-5 md:p-6">
+      <Card className="rounded-[28px] p-5 md:p-6">
         <div className="flex flex-wrap gap-2 mb-5">
           {FILTERS.map((item) => (
-            <button
+            <Button
               type="button"
               key={item.key}
               onClick={() => handleFilterChange(item.key)}
-              className={`px-3.5 py-2 rounded-xl text-sm font-bold transition-colors ${
+              variant={filter === item.key ? 'primary' : 'outline'}
+              size="sm"
+              className={`text-sm ${
                 filter === item.key
-                  ? 'bg-primary text-white'
-                  : 'border border-text-secondary/20 text-text-secondary hover:text-text-primary hover:border-text-secondary/40'
+                  ? ''
+                  : 'text-text-secondary hover:text-text-primary hover:border-text-secondary/40'
               }`}
             >
               {item.label}
-            </button>
+            </Button>
           ))}
         </div>
 
@@ -336,22 +340,26 @@ export default function AutomationPage() {
                             </Link>
                             {pending && (
                               <>
-                                <button
+                                <Button
                                   type="button"
                                   disabled={busyPostId === post.id}
                                   onClick={() => handleApprove(post.id)}
-                                  className="px-3 py-1.5 rounded-lg border border-emerald-300 text-emerald-700 text-xs font-bold hover:bg-emerald-50 transition-colors disabled:opacity-60"
+                                  variant="outline"
+                                  size="sm"
+                                  className="rounded-lg border-emerald-300 text-emerald-700 text-xs hover:bg-emerald-50"
                                 >
                                   Approve
-                                </button>
-                                <button
+                                </Button>
+                                <Button
                                   type="button"
                                   disabled={busyPostId === post.id}
                                   onClick={() => handleReject(post.id)}
-                                  className="px-3 py-1.5 rounded-lg border border-red-300 text-red-700 text-xs font-bold hover:bg-red-50 transition-colors disabled:opacity-60"
+                                  variant="outline"
+                                  size="sm"
+                                  className="rounded-lg border-red-300 text-red-700 text-xs hover:bg-red-50"
                                 >
                                   Reject
-                                </button>
+                                </Button>
                               </>
                             )}
                           </div>
@@ -365,18 +373,19 @@ export default function AutomationPage() {
 
             {hasMore && (
               <div className="mt-4 flex justify-center">
-                <button
+                <Button
                   type="button"
                   onClick={() => setVisibleCount((prev) => prev + PAGE_SIZE)}
-                  className="px-4 py-2 rounded-xl border border-text-secondary/20 text-text-primary font-bold hover:border-text-secondary/40 transition-colors"
+                  variant="outline"
+                  className="text-text-primary hover:border-text-secondary/40"
                 >
                   View More
-                </button>
+                </Button>
               </div>
             )}
           </>
         )}
-      </div>
+      </Card>
     </section>
   );
 }

@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Calendar, Clock3, Save } from 'lucide-react';
 import { usePosts } from '@/hooks/usePosts';
+import { Alert, Button, Card, Input } from '@/components/common';
 
 function toLocalDatetime(value?: string | null): string {
   if (!value) return '';
@@ -98,13 +99,12 @@ export default function SchedulerPage() {
       </div>
 
       {(error || notice) && (
-        <div className="mb-6 rounded-2xl border border-text-secondary/10 bg-bg-primary px-4 py-3">
-          {error && <p className="text-red-500 text-sm font-medium">{error}</p>}
-          {notice && <p className="text-emerald-600 text-sm font-medium">{notice}</p>}
-        </div>
+        <Alert variant={error ? 'alert' : 'success'} className="mb-6">
+          {error || notice}
+        </Alert>
       )}
 
-      <div className="bg-bg-primary rounded-[32px] border border-text-secondary/10 p-6 md:p-8 shadow-sm">
+      <Card className="rounded-[32px] p-6 md:p-8 shadow-sm">
         {isLoading ? (
           <p className="text-sm text-text-secondary">Loading draft posts...</p>
         ) : schedulerPosts.length === 0 ? (
@@ -129,7 +129,7 @@ export default function SchedulerPage() {
               const currentLocal = localTimes[post.id] ?? toLocalDatetime(post.scheduledFor);
               const isSaving = !!savingById[post.id];
               return (
-                <article
+                <Card
                   key={post.id}
                   className="rounded-2xl border border-text-secondary/10 p-4 md:p-5 hover:border-text-secondary/30 transition-colors"
                 >
@@ -153,31 +153,32 @@ export default function SchedulerPage() {
                     </div>
 
                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                      <input
+                      <Input
                         type="datetime-local"
                         value={currentLocal}
                         onChange={(event) =>
                           setLocalTimes((prev) => ({ ...prev, [post.id]: event.target.value }))
                         }
-                        className="rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                        className="text-sm"
                       />
-                      <button
+                      <Button
                         type="button"
                         disabled={isSaving || !currentLocal}
                         onClick={() => saveSchedule(post.id, post.scheduledFor)}
-                        className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-60"
+                        isLoading={isSaving}
+                        className="text-sm"
                       >
                         <Save size={14} />
-                        {isSaving ? 'Saving...' : 'Save Time'}
-                      </button>
+                        Save Time
+                      </Button>
                     </div>
                   </div>
-                </article>
+                </Card>
               );
             })}
           </div>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

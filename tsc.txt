@@ -1,8 +1,0 @@
-﻿src/app/settings/page.tsx(13,32): error TS2304: Cannot find name 'useUser'.
-src/app/settings/page.tsx(40,34): error TS2304: Cannot find name 'token'.
-src/app/settings/page.tsx(61,12): error TS2304: Cannot find name 'token'.
-src/app/settings/page.tsx(75,7): error TS2304: Cannot find name 'token'.
-src/app/settings/page.tsx(81,10): error TS2304: Cannot find name 'token'.
-src/app/settings/page.tsx(112,19): error TS2304: Cannot find name 'token'.
-src/app/settings/page.tsx(141,10): error TS2304: Cannot find name 'token'.
-src/app/settings/page.tsx(179,5): error TS2552: Cannot find name 'logout'. Did you mean 'LogOut'?

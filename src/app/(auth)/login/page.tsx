@@ -3,8 +3,9 @@
 import React, { useState, useTransition, FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FcGoogle } from "react-icons/fc";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { login } from "@/lib/api/auth";
+import { Alert, Button, Card, Input } from "@/components/common";
 
 const LoginPage = () => {
   const router = useRouter();
@@ -43,26 +44,27 @@ const LoginPage = () => {
 
   return (
     <section className="min-h-screen w-screen flex flex-col items-center justify-center bg-background p-4">
-      <div className="z-10 w-full max-w-[480px] bg-bg-primary rounded-[32px] border border-background p-10 shadow-lg">
+      <Card className="z-10 w-full max-w-[480px] rounded-[32px] border-background p-10 shadow-lg">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-txt-primary mb-2">Welcome Back</h1>
           <p className="text-txt-secondary">Log in to your workspace</p>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-500/10 text-red-500 rounded-xl text-sm font-bold border border-red-500/20 text-center">
+          <Alert variant="alert" className="mb-4 text-center">
             {error}
-          </div>
+          </Alert>
         )}
 
-        <button
+        <Button
           type="button"
           onClick={handleGoogleLogin}
-          className="w-full flex items-center justify-center gap-3 py-4 border rounded-2xl transition-all font-bold text-txt-primary hover:bg-background active:scale-95 mb-8"
+          variant="outline"
+          className="mb-8 w-full rounded-2xl py-4 text-text-primary"
         >
           <FcGoogle className="w-6 h-6" />
           <span>Continue with Google</span>
-        </button>
+        </Button>
 
         <div className="relative flex items-center my-8">
           <div className="flex-grow border-t border-txt-secondary/20"></div>
@@ -71,34 +73,37 @@ const LoginPage = () => {
         </div>
 
         <form className="space-y-5" onSubmit={handleLogin}>
-          <input
+          <Input
             type="email"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-5 py-4 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary text-txt-primary"
+            className="rounded-2xl px-5 py-4 text-txt-primary"
+            variant="filled"
             placeholder="name@company.com"
             autoComplete="email"
           />
 
-          <div className="relative">
-            <input
-              type={showPassword ? "text" : "password"}
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-5 py-4 bg-background border border-bg-primary rounded-2xl outline-none focus:ring-2 focus:ring-primary text-txt-primary"
-              placeholder="••••••••"
-              autoComplete="current-password"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-5 top-1/2 -translate-y-1/2 text-txt-secondary"
-            >
-              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-            </button>
-          </div>
+          <Input
+            type={showPassword ? "text" : "password"}
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="rounded-2xl px-5 py-4 pr-14 text-txt-primary"
+            variant="filled"
+            placeholder="••••••••"
+            autoComplete="current-password"
+            rightNode={
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="text-txt-secondary"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            }
+          />
 
           <div className="text-right">
             <a href="/forgot-password" className="text-sm text-primary hover:underline font-semibold">
@@ -106,13 +111,14 @@ const LoginPage = () => {
             </a>
           </div>
 
-          <button
+          <Button
             type="submit"
             disabled={isPending}
-            className="w-full py-4 bg-primary text-white rounded-2xl font-bold text-lg hover:opacity-90 transition-all flex items-center justify-center"
+            isLoading={isPending}
+            className="w-full rounded-2xl py-4 text-lg"
           >
-            {isPending ? <Loader2 className="animate-spin" /> : "Log In"}
-          </button>
+            Log In
+          </Button>
         </form>
 
         <p className="mt-6 text-center text-sm text-txt-secondary">
@@ -121,7 +127,7 @@ const LoginPage = () => {
             Sign up
           </a>
         </p>
-      </div>
+      </Card>
     </section>
   );
 };

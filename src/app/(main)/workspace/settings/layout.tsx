@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { UserCircle, Key, Users } from 'lucide-react';
+import { Card } from '@/components/common';
 
 export default function WorkspaceSettingsLayout({
   children,
@@ -27,7 +28,7 @@ export default function WorkspaceSettingsLayout({
 
       <div className="flex flex-col md:flex-row gap-8 items-start">
         {/* Left Sidebar */}
-        <aside className="w-full md:w-64 flex-shrink-0 space-y-1">
+        <Card className="w-full md:w-64 flex-shrink-0 space-y-1 p-2 rounded-lg">
           {links.map((item) => {
             const isActive = pathname === item.href;
             return (
@@ -45,12 +46,12 @@ export default function WorkspaceSettingsLayout({
                </Link>
             )
           })}
-        </aside>
+        </Card>
 
         {/* Main Setting Content Area */}
-        <main className="flex-1 bg-bg-primary border border-text-secondary/10 rounded-lg shadow-sm min-h-[500px]">
+        <Card className="flex-1 rounded-lg shadow-sm min-h-[500px]">
           {children}
-        </main>
+        </Card>
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ import { ArrowLeft, CalendarDays, Clock3, Eye, ImagePlus, Link2, Save, Send, Shi
 import { usePosts } from '@/hooks/usePosts';
 import type { PostAsset } from '@/lib/api/posts';
 import type { UpdatePostInput } from '@/lib/schemas';
+import { Alert, Button, Card, Input, Select, Textarea } from '@/components/common';
 
 type PublishMode = 'manual' | 'manualDraft' | 'scheduled';
 type TabKey = 'overview' | 'edit' | 'assets';
@@ -294,36 +295,33 @@ export default function AutomationPostDetailsPage() {
       </div>
 
       {(error || formError || notice) && (
-        <div className="mb-6 rounded-2xl border border-text-secondary/10 bg-bg-primary px-4 py-3 text-sm font-medium">
-          {error && <p className="text-red-600">{error}</p>}
-          {formError && <p className="text-red-600">{formError}</p>}
-          {notice && <p className="text-emerald-700">{notice}</p>}
-        </div>
+        <Alert variant={error || formError ? 'alert' : 'success'} className="mb-6">
+          {error || formError || notice}
+        </Alert>
       )}
 
       {!post && isLoading && (
-        <div className="rounded-2xl border border-text-secondary/10 bg-bg-primary p-6 text-text-secondary">
+        <Card className="p-6 text-text-secondary">
           Loading post...
-        </div>
+        </Card>
       )}
 
       {!post && !isLoading && (
-        <div className="rounded-2xl border border-text-secondary/10 bg-bg-primary p-6">
+        <Card className="p-6">
           <h2 className="text-xl font-black text-text-primary mb-2">Post Not Found</h2>
           <p className="text-text-secondary mb-4">The post was not found in local store. Refresh to load latest.</p>
-          <button
+          <Button
             type="button"
             onClick={() => refreshFromApi()}
-            className="px-4 py-2.5 rounded-xl bg-primary text-white font-bold hover:opacity-90 transition-opacity"
           >
             Refresh
-          </button>
-        </div>
+          </Button>
+        </Card>
       )}
 
       {post && draft && (
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-6">
-          <div className="bg-bg-primary rounded-[28px] border border-text-secondary/10 p-6 md:p-8">
+          <Card className="rounded-[28px] p-6 md:p-8">
             <div className="flex flex-wrap gap-2 mb-6">
               <TabButton active={activeTab === 'overview'} onClick={() => setActiveTab('overview')} label="Overview" />
               <TabButton active={activeTab === 'edit'} onClick={() => setActiveTab('edit')} label="Edit" />
@@ -350,38 +348,38 @@ export default function AutomationPostDetailsPage() {
               <div className="space-y-4">
                 <label className="text-sm font-bold text-text-primary block">
                   Title
-                  <input
+                  <Input
                     value={draft.title}
                     onChange={(event) => setDraft((prev) => (prev ? { ...prev, title: event.target.value } : prev))}
-                    className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
+                    className="mt-1.5"
                   />
                 </label>
                 <label className="text-sm font-bold text-text-primary block">
                   Caption
-                  <textarea
+                  <Textarea
                     value={draft.captionText}
                     onChange={(event) => setDraft((prev) => (prev ? { ...prev, captionText: event.target.value } : prev))}
-                    className="mt-1.5 w-full min-h-[130px] rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
+                    className="mt-1.5 min-h-[130px]"
                   />
                 </label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <label className="text-sm font-bold text-text-primary block">
                     Publish Mode
-                    <select
+                    <Select
                       value={draft.publishMode}
                       onChange={(event) => setDraft((prev) => (prev ? { ...prev, publishMode: event.target.value as PublishMode } : prev))}
-                      className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
+                      className="mt-1.5"
                     >
                       <option value="manual">Manual</option>
                       <option value="scheduled">Scheduled</option>
-                    </select>
+                    </Select>
                   </label>
                   <label className="text-sm font-bold text-text-primary block">
                     Source Timezone
-                    <input
+                    <Input
                       value={draft.sourceTimezone}
                       onChange={(event) => setDraft((prev) => (prev ? { ...prev, sourceTimezone: event.target.value } : prev))}
-                      className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
+                      className="mt-1.5"
                     />
                   </label>
                 </div>
@@ -393,11 +391,11 @@ export default function AutomationPostDetailsPage() {
                         <CalendarDays size={15} />
                         Day
                       </span>
-                      <input
+                      <Input
                         type="date"
                         value={draft.dateValue}
                         onChange={(event) => setDraft((prev) => (prev ? { ...prev, dateValue: event.target.value } : prev))}
-                        className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
+                        className="mt-1.5"
                       />
                     </label>
                     <label className="text-sm font-bold text-text-primary block">
@@ -405,11 +403,11 @@ export default function AutomationPostDetailsPage() {
                         <Clock3 size={15} />
                         Time
                       </span>
-                      <input
+                      <Input
                         type="time"
                         value={draft.timeValue}
                         onChange={(event) => setDraft((prev) => (prev ? { ...prev, timeValue: event.target.value } : prev))}
-                        className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
+                        className="mt-1.5"
                       />
                     </label>
                   </div>
@@ -417,22 +415,22 @@ export default function AutomationPostDetailsPage() {
 
                 <label className="text-sm font-bold text-text-primary block">
                   Metadata Note
-                  <input
+                  <Input
                     value={draft.metadataNote}
                     onChange={(event) => setDraft((prev) => (prev ? { ...prev, metadataNote: event.target.value } : prev))}
-                    className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
+                    className="mt-1.5"
                   />
                 </label>
 
-                <button
+                <Button
                   type="button"
                   disabled={isSaving}
+                  isLoading={isSaving}
                   onClick={handleSave}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-white font-bold hover:opacity-90 transition-opacity disabled:opacity-60"
                 >
                   <Save size={15} />
-                  {isSaving ? 'Saving...' : 'Save Changes'}
-                </button>
+                  Save Changes
+                </Button>
               </div>
             )}
 
@@ -441,52 +439,52 @@ export default function AutomationPostDetailsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <label className="text-sm font-bold text-text-primary block">
                     <span className="inline-flex items-center gap-2">
-                      <ImagePlus size={15} />
-                      Upload File Asset
-                    </span>
-                    <input
+                        <ImagePlus size={15} />
+                        Upload File Asset
+                      </span>
+                    <Input
                       type="file"
                       accept="image/*,video/*"
                       onChange={(event) => setAssetFile(event.target.files?.[0] ?? null)}
-                      className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
+                      className="mt-1.5"
                     />
                   </label>
-                  <button
+                  <Button
                     type="button"
                     onClick={handleUploadFile}
                     disabled={!assetFile || isUploading}
-                    className="self-end inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-primary/30 text-primary font-bold hover:bg-primary/5 transition-colors disabled:opacity-60"
+                    variant="outline"
+                    className="self-end border-primary/30 text-primary hover:bg-primary/5"
                   >
                     <ImagePlus size={15} />
                     {isUploading ? 'Uploading...' : 'Upload Asset'}
-                  </button>
+                  </Button>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_190px_170px] gap-3">
-                  <input
+                  <Input
                     value={assetUrl}
                     onChange={(event) => setAssetUrl(event.target.value)}
-                    className="rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
                     placeholder="https://example.com/asset.png"
                   />
-                  <select
+                  <Select
                     value={assetUrlType}
                     onChange={(event) => setAssetUrlType(event.target.value as AssetType)}
-                    className="rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
                   >
                     <option value="image">Image</option>
                     <option value="video">Video</option>
                     <option value="document">Document</option>
-                  </select>
-                  <button
+                  </Select>
+                  <Button
                     type="button"
                     onClick={handleAttachUrl}
                     disabled={isAttaching || !assetUrl.trim()}
-                    className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-primary/30 text-primary font-bold hover:bg-primary/5 transition-colors disabled:opacity-60"
+                    variant="outline"
+                    className="border-primary/30 text-primary hover:bg-primary/5"
                   >
                     <Link2 size={15} />
                     {isAttaching ? 'Attaching...' : 'Attach URL'}
-                  </button>
+                  </Button>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -494,7 +492,7 @@ export default function AutomationPostDetailsPage() {
                     const url = getAssetUrl(asset);
                     const type = String(asset.assetType ?? 'asset').toLowerCase();
                     return (
-                      <article key={`${asset.id ?? index}`} className="rounded-xl border border-text-secondary/10 p-3">
+                      <Card key={`${asset.id ?? index}`} className="rounded-xl p-3">
                         <p className="text-xs font-bold uppercase tracking-wide text-text-secondary mb-2">
                           {asset.assetType ?? 'asset'}
                         </p>
@@ -524,7 +522,7 @@ export default function AutomationPostDetailsPage() {
                           <p>ID: {String(asset.id ?? '-')}</p>
                           <p>Sort: {String(asset.sortOrder ?? 0)}</p>
                         </div>
-                      </article>
+                      </Card>
                     );
                   })}
                   {(post.assets ?? []).length === 0 && (
@@ -533,52 +531,56 @@ export default function AutomationPostDetailsPage() {
                 </div>
               </div>
             )}
-          </div>
+          </Card>
 
-          <aside className="bg-bg-primary rounded-[28px] border border-text-secondary/10 p-5 h-fit space-y-5">
+          <Card className="rounded-[28px] p-5 h-fit space-y-5">
             <div>
               <h2 className="text-sm font-black uppercase tracking-wide text-text-secondary mb-2">Quick Actions</h2>
-              <button
+              <Button
                 type="button"
                 onClick={handleQueue}
                 disabled={isQueueing}
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-300 text-emerald-700 font-bold hover:bg-emerald-50 transition-colors disabled:opacity-60"
+                variant="outline"
+                className="w-full border-emerald-300 text-emerald-700 hover:bg-emerald-50"
               >
                 <Send size={15} />
                 {isQueueing ? 'Queueing...' : 'Queue Publish'}
-              </button>
+              </Button>
             </div>
 
             <div className="pt-4 border-t border-text-secondary/10">
               <h2 className="text-sm font-black uppercase tracking-wide text-text-secondary mb-2">Approval</h2>
-              <input
+              <Input
                 value={reviewReason}
                 onChange={(event) => setReviewReason(event.target.value)}
-                className="w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
                 placeholder="Approval or reject reason"
               />
               <div className="grid grid-cols-2 gap-2 mt-2">
-                <button
+                <Button
                   type="button"
                   onClick={handleApprove}
                   disabled={isApproving}
-                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-emerald-300 text-emerald-700 text-xs font-bold hover:bg-emerald-50 transition-colors disabled:opacity-60"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-lg border-emerald-300 text-emerald-700 text-xs hover:bg-emerald-50"
                 >
                   <ShieldCheck size={14} />
                   {isApproving ? '...' : 'Approve'}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   onClick={handleReject}
                   disabled={isRejecting}
-                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-red-300 text-red-700 text-xs font-bold hover:bg-red-50 transition-colors disabled:opacity-60"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-lg border-red-300 text-red-700 text-xs hover:bg-red-50"
                 >
                   <ShieldX size={14} />
                   {isRejecting ? '...' : 'Reject'}
-                </button>
+                </Button>
               </div>
             </div>
-          </aside>
+          </Card>
         </div>
       )}
     </section>
@@ -587,25 +589,22 @@ export default function AutomationPostDetailsPage() {
 
 function TabButton({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
   return (
-    <button
+    <Button
       type="button"
       onClick={onClick}
-      className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
-        active
-          ? 'bg-primary text-white'
-          : 'border border-text-secondary/20 text-text-secondary hover:text-text-primary hover:border-text-secondary/40'
-      }`}
+      variant={active ? 'primary' : 'outline'}
+      className={active ? '' : 'text-text-secondary hover:text-text-primary hover:border-text-secondary/40'}
     >
       {label}
-    </button>
+    </Button>
   );
 }
 
 function DetailRow({ label, value, multiline = false }: { label: string; value: string; multiline?: boolean }) {
   return (
-    <div className="rounded-xl border border-text-secondary/10 p-3">
+    <Card className="rounded-xl p-3">
       <p className="text-xs font-bold uppercase tracking-wide text-text-secondary">{label}</p>
       <p className={`text-sm font-semibold text-text-primary mt-1 ${multiline ? 'whitespace-pre-wrap' : ''}`}>{value}</p>
-    </div>
+    </Card>
   );
 }

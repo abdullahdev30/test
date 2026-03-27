@@ -1,16 +1,14 @@
 'use client';
-
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, CalendarDays, Clock3, ImagePlus, Plus, RefreshCw } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { usePosts } from '@/hooks/usePosts';
 import type { CreatePostInput } from '@/lib/schemas';
-
+import { Alert, Button, Card, Checkbox, Input, Select } from '@/components/common';
 type PublishMode = 'manual' | 'scheduled';
 type AssetType = 'image' | 'video' | 'document';
 type Provider = 'linkedin' | 'facebook' | 'instagram' | 'google_business_profile';
-
 const PLATFORM_OPTIONS: Array<{ label: string; value: Provider }> = [
   { label: 'LinkedIn', value: 'linkedin' },
   { label: 'Facebook', value: 'facebook' },
@@ -24,7 +22,6 @@ const PROVIDER_TO_CONNECTION_KEY: Record<Provider, string> = {
   instagram: 'instagram',
   google_business_profile: 'google-business-profile',
 };
-
 interface SocialConnection {
   connected: boolean;
   status: string;
@@ -46,7 +43,6 @@ function extractSocialConnectionId(payload: unknown): string | null {
   const fromConnection =
     (connection?.socialConnectionId as string | undefined) ??
     (connection?.id as string | undefined);
-
   return fromConnection ?? fromRoot ?? null;
 }
 
@@ -65,16 +61,15 @@ function inferAssetType(file: File): AssetType {
 export default function CreateAutomationPostPage() {
   const router = useRouter();
   const { createNewPost, setTargetsForPost, uploadAssetFile, queuePublish, clearError } = usePosts();
-
-  const [title, setTitle] = useState('April Campaign Launch');
-  const [captionText, setCaptionText] = useState('Launching our April campaign with fresh offers.');
+  const [title, setTitle] = useState('New Post ');
+  const [captionText, setCaptionText] = useState('Launching our campaign with fresh offers.');
   const [publishMode, setPublishMode] = useState<PublishMode>('manual');
   const [dateValue, setDateValue] = useState('');
   const [timeValue, setTimeValue] = useState('');
   const [sourceTimezone, setSourceTimezone] = useState('Asia/Karachi');
   const [approvalRequired, setApprovalRequired] = useState(true);
   const [automated, setAutomated] = useState(false);
-  const [campaignMeta, setCampaignMeta] = useState('april-2026');
+  const [campaignMeta, setCampaignMeta] = useState('2026');
   const [selectedProviders, setSelectedProviders] = useState<Record<Provider, boolean>>({
     linkedin: false,
     facebook: false,
@@ -273,36 +268,32 @@ export default function CreateAutomationPostPage() {
             Select platforms with checkboxes, set time/timezone, and create the post.
           </p>
         </div>
-        <Link
-          href="/posts"
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-text-secondary/20 text-text-secondary hover:text-text-primary hover:border-text-secondary/40 transition-colors font-bold"
-        >
+        <Link  href="/posts" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-text-secondary/20 text-text-secondary hover:text-text-primary hover:border-text-secondary/40 transition-colors font-bold"  >
           <ArrowLeft size={16} />
           Back to Automation
         </Link>
       </div>
-
       {(formError || connectionError) && (
-        <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+        <Alert variant="alert" className="mb-6">
           {formError || connectionError}
-        </div>
+        </Alert>
       )}
 
-      <div className="bg-bg-primary rounded-[28px] border border-text-secondary/10 p-6 md:p-8">
+      <Card className="rounded-[28px] p-6 md:p-8">
         <form className="space-y-6" onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label className="text-sm font-bold text-text-primary block">
               Title
-              <input
-                className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+              <Input
+                className="mt-1.5"
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
               />
             </label>
             <label className="text-sm font-bold text-text-primary block">
               Caption
-              <input
-                className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+              <Input
+                className="mt-1.5"
                 value={captionText}
                 onChange={(event) => setCaptionText(event.target.value)}
               />
@@ -312,27 +303,27 @@ export default function CreateAutomationPostPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <label className="text-sm font-bold text-text-primary block">
               Publish Mode
-              <select
-                className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
+              <Select
+                className="mt-1.5"
                 value={publishMode}
                 onChange={(event) => setPublishMode(event.target.value as PublishMode)}
               >
                 <option value="manual">Manual</option>
                 <option value="scheduled">Scheduled</option>
-              </select>
+              </Select>
             </label>
             <label className="text-sm font-bold text-text-primary block">
               Source Timezone
-              <input
-                className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
+              <Input
+                className="mt-1.5"
                 value={sourceTimezone}
                 onChange={(event) => setSourceTimezone(event.target.value)}
               />
             </label>
             <label className="text-sm font-bold text-text-primary block">
               Metadata Campaign
-              <input
-                className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
+              <Input
+                className="mt-1.5"
                 value={campaignMeta}
                 onChange={(event) => setCampaignMeta(event.target.value)}
               />
@@ -346,9 +337,9 @@ export default function CreateAutomationPostPage() {
                   <CalendarDays size={15} />
                   Day
                 </span>
-                <input
+                <Input
                   type="date"
-                  className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
+                  className="mt-1.5"
                   value={dateValue}
                   onChange={(event) => setDateValue(event.target.value)}
                 />
@@ -358,9 +349,9 @@ export default function CreateAutomationPostPage() {
                   <Clock3 size={15} />
                   Time
                 </span>
-                <input
+                <Input
                   type="time"
-                  className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
+                  className="mt-1.5"
                   value={timeValue}
                   onChange={(event) => setTimeValue(event.target.value)}
                 />
@@ -368,18 +359,20 @@ export default function CreateAutomationPostPage() {
             </div>
           )}
 
-          <div className="rounded-2xl border border-text-secondary/10 p-4">
+          <Card className="rounded-2xl p-4">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
               <h2 className="text-sm font-black text-text-primary uppercase tracking-wide">Platforms</h2>
               <div className="flex items-center gap-2">
-                <button
+                <Button
                   type="button"
                   onClick={loadConnections}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-text-secondary/20 text-text-secondary text-xs font-bold hover:text-text-primary hover:border-text-secondary/40 transition-colors"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-lg text-text-secondary text-xs hover:text-text-primary hover:border-text-secondary/40"
                 >
                   <RefreshCw size={12} className={isLoadingConnections ? 'animate-spin' : ''} />
                   Refresh
-                </button>
+                </Button>
                 <Link
                   href="/connections"
                   className="inline-flex items-center px-2.5 py-1.5 rounded-lg border border-primary/30 text-primary text-xs font-bold hover:bg-primary/5 transition-colors"
@@ -392,7 +385,7 @@ export default function CreateAutomationPostPage() {
               {PLATFORM_OPTIONS.map((platform) => (
                 <label key={platform.value} className="inline-flex items-center justify-between gap-2 text-sm font-bold text-text-primary border border-text-secondary/10 rounded-lg px-2.5 py-2">
                   <span className="inline-flex items-center gap-2">
-                  <input
+                  <Checkbox
                     type="checkbox"
                     checked={selectedProviders[platform.value]}
                     onChange={() => toggleProvider(platform.value)}
@@ -410,24 +403,24 @@ export default function CreateAutomationPostPage() {
                 </label>
               ))}
             </div>
-          </div>
+          </Card>
 
           <label className="text-sm font-bold text-text-primary block">
             <span className="inline-flex items-center gap-2">
               <ImagePlus size={15} />
               Upload Asset (Image or Video)
             </span>
-            <input
+            <Input
               type="file"
               accept="image/*,video/*"
-              className="mt-1.5 w-full rounded-xl border border-text-secondary/20 bg-transparent px-3 py-2.5 text-sm"
+              className="mt-1.5"
               onChange={(event) => setAssetFile(event.target.files?.[0] ?? null)}
             />
           </label>
 
           <div className="flex flex-wrap items-center gap-6 text-sm font-bold text-text-primary">
             <label className="inline-flex items-center gap-2">
-              <input
+              <Checkbox
                 type="checkbox"
                 checked={approvalRequired}
                 onChange={(event) => setApprovalRequired(event.target.checked)}
@@ -435,7 +428,7 @@ export default function CreateAutomationPostPage() {
               Approval Required
             </label>
             <label className="inline-flex items-center gap-2">
-              <input
+              <Checkbox
                 type="checkbox"
                 checked={automated}
                 onChange={(event) => setAutomated(event.target.checked)}
@@ -443,7 +436,7 @@ export default function CreateAutomationPostPage() {
               Automated Post
             </label>
             <label className="inline-flex items-center gap-2">
-              <input
+              <Checkbox
                 type="checkbox"
                 checked={queueAfterCreate}
                 onChange={(event) => setQueueAfterCreate(event.target.checked)}
@@ -452,16 +445,17 @@ export default function CreateAutomationPostPage() {
             </label>
           </div>
 
-          <button
+          <Button
             type="submit"
             disabled={isSubmitting}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-white font-bold hover:opacity-90 transition-opacity disabled:opacity-60"
+            isLoading={isSubmitting}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl"
           >
             <Plus size={16} />
-            {isSubmitting ? 'Creating...' : 'Create Automation Post'}
-          </button>
+            Create Automation Post
+          </Button>
         </form>
-      </div>
+      </Card>
     </section>
   );
 }
