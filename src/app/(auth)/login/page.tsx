@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useTransition, FormEvent } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { FcGoogle } from "react-icons/fc";
 import { Eye, EyeOff } from "lucide-react";
 import { login } from "@/lib/api/auth";
@@ -9,7 +9,6 @@ import { Alert, Button, Card, Input } from "@/components/common";
 
 const LoginPage = () => {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -17,7 +16,8 @@ const LoginPage = () => {
   const [isPending, startTransition] = useTransition();
 
   const handleGoogleLogin = () => {
-    const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
+    const callbackUrl =
+      new URLSearchParams(window.location.search).get("callbackUrl") || "/dashboard";
     const oauthUrl = `/api/auth/google?next=${encodeURIComponent(callbackUrl)}`;
     // Redirect through a server-side proxy — backend URL never exposed
     window.location.href = oauthUrl;

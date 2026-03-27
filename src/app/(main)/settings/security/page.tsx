@@ -1,183 +1,384 @@
 "use client";
 
-import React, { useState, useEffect, useTransition } from "react";
+import React, { useEffect, useMemo, useState, useTransition } from "react";
 import {
-  AlertCircle, Laptop, Smartphone, X, Check,
-  Lock, Eye, EyeOff, ShieldCheck
+  AlertTriangle,
+  Check,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Laptop,
+  Link2,
+  LogOut,
+  Shield,
+  Smartphone,
+  Trash2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { changePassword, setPassword } from "@/lib/api/auth";
-import { getSessions, revokeSession, logoutAll } from "@/lib/api/user";
+import { getSessions, revokeSession } from "@/lib/api/user";
 import { Alert, Button, Card, Input, Spinner } from "@/components/common";
+
+type PasswordAction = "change" | "set";
 
 export default function SecuritySettingsPage() {
   const router = useRouter();
-  const [passwordMode, setPasswordMode] = useState<'change' | 'set' | null>(null);
+  const [passwordAction, setPasswordAction] = useState<PasswordAction>("change");
   const [isSaving, startSaveTransition] = useTransition();
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [sessions, setSessions] = useState<Record<string, unknown>[]>([]);
+  const [showAllSessions, setShowAllSessions] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [passwordForm, setPasswordForm] = useState({ current: "", new: "", confirm: "" });
-  const [showPass, setShowPass] = useState({ current: false, new: false, confirm: false });
+  const [passwordForm, setPasswordForm] = useState({
+    current: "",
+    next: "",
+    confirm: "",
+  });
+  const [showPass, setShowPass] = useState({
+    current: false,
+    next: false,
+    confirm: false,
+  });
 
-  const fetchSessions = async () => {
+  async function fetchSessions() {
     setLoadingSessions(true);
+    setError(null);
     try {
       const result = await getSessions();
+      if (!result.success) {
+        setError(result.error ?? "Failed to load sessions.");
+        setSessions([]);
+        return;
+      }
       setSessions(result.sessions as Record<string, unknown>[]);
     } catch {
       setSessions([]);
+      setError("Failed to load sessions.");
     } finally {
       setLoadingSessions(false);
     }
-  };
+  }
 
-  useEffect(() => { fetchSessions(); }, []);
+  useEffect(() => {
+    fetchSessions();
+  }, []);
 
-  const handlePasswordSubmit = () => {
-    if (passwordForm.new !== passwordForm.confirm) {
-      setError("Passwords do not match");
+  const visibleSessions = useMemo(
+    () => (showAllSessions ? sessions : sessions.slice(0, 2)),
+    [sessions, showAllSessions],
+  );
+
+  function handlePasswordSubmit() {
+    if (passwordForm.next !== passwordForm.confirm) {
+      setError("Passwords do not match.");
       return;
     }
+
     setError(null);
     startSaveTransition(async () => {
-      const result = passwordMode === 'change'
-        ? await changePassword({
-          currentPassword: passwordForm.current,
-          newPassword: passwordForm.new,
-          confirmPassword: passwordForm.confirm,
-        })
-        : await setPassword({
-          password: passwordForm.new,
-          confirmPassword: passwordForm.confirm,
-        });
+      const result =
+        passwordAction === "change"
+          ? await changePassword({
+              currentPassword: passwordForm.current,
+              newPassword: passwordForm.next,
+              confirmPassword: passwordForm.confirm,
+            })
+          : await setPassword({
+              password: passwordForm.next,
+              confirmPassword: passwordForm.confirm,
+            });
 
-      if (result.success) {
-        setPasswordMode(null);
-        setPasswordForm({ current: "", new: "", confirm: "" });
-        setShowSuccessModal(true);
-      } else {
-        setError(result.error ?? "Operation failed");
+      if (!result.success) {
+        setError(result.error ?? "Unable to update password.");
+        return;
       }
-    });
-  };
 
-  const handleRevokeSession = (id: string) => {
+      setPasswordForm({ current: "", next: "", confirm: "" });
+      setShowSuccessModal(true);
+    });
+  }
+
+  function handleRevokeSession(id: string) {
+    setError(null);
     startSaveTransition(async () => {
       const result = await revokeSession(id);
-      if (result.success) {
-        setSessions((prev) => prev.filter((s) => (s as { id: string }).id !== id));
-      } else {
-        setError(result.error ?? "Failed to revoke session");
+      if (!result.success) {
+        setError(result.error ?? "Failed to revoke session.");
+        return;
+      }
+      setSessions((prev) => prev.filter((session) => String((session as { id?: string }).id ?? "") !== id));
+    });
+  }
+
+  function handleRevokeAllSessions() {
+    setError(null);
+    startSaveTransition(async () => {
+      try {
+        const response = await fetch("/api/auth/sessions/revoke-all", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { Accept: "application/json", "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+
+        if (!response.ok) {
+          setError("Unable to revoke all sessions. Please try again.");
+          return;
+        }
+
+        await fetchSessions();
+      } catch {
+        setError("Unable to revoke all sessions. Please try again.");
       }
     });
-  };
+  }
 
-  const handleLogoutAll = () => {
+  function handleLogoutAll() {
+    setError(null);
     startSaveTransition(async () => {
-      await logoutAll();
-      router.push('/login');
+      try {
+        const response = await fetch("/api/auth/logout-all", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { Accept: "application/json", "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+
+        if (!response.ok) {
+          setError("Unable to log out all sessions. Please try again.");
+          return;
+        }
+
+        router.push("/login");
+      } catch {
+        setError("Unable to log out all sessions. Please try again.");
+      }
     });
-  };
+  }
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto p-4 animate-in fade-in duration-500">
+    <div className="space-y-6">
       {showSuccessModal && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <Card className="rounded-[32px] p-10 shadow-2xl max-w-[340px] w-full text-center">
-            <div className="w-16 h-16 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6"><Check size={32} /></div>
-            <h3 className="text-2xl font-black text-text-primary mb-2">Success!</h3>
-            <p className="text-sm text-text-secondary mb-8">Security settings updated.</p>
-            <Button onClick={() => setShowSuccessModal(false)} className="w-full py-4 rounded-2xl text-sm uppercase">Continue</Button>
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <Card className="w-full max-w-sm rounded-3xl p-8 text-center shadow-2xl">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600">
+              <Check size={28} />
+            </div>
+            <h3 className="text-2xl font-black text-text-primary">Security Updated</h3>
+            <p className="mt-2 text-sm text-text-secondary">Password settings saved successfully.</p>
+            <Button className="mt-6 w-full" onClick={() => setShowSuccessModal(false)}>
+              Continue
+            </Button>
           </Card>
         </div>
       )}
 
-      {/* Password Management Card */}
-      <Card className="rounded-[40px] p-10 shadow-sm">
-        {!passwordMode ? (
-          <div className="space-y-8">
-            <div className="flex items-start gap-5">
-              <div className="p-4 bg-primary/10 text-primary rounded-3xl"><Lock size={28} /></div>
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <Card className="w-full max-w-md rounded-3xl p-8 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 rounded-xl bg-red-500/10 p-2 text-red-600">
+                <AlertTriangle size={18} />
+              </div>
               <div>
-                <h3 className="text-2xl font-black text-text-primary">Password Security</h3>
-                <p className="text-sm text-text-secondary font-medium mt-1">Manage your password or set a credential for Google Auth.</p>
+                <h3 className="text-xl font-black text-text-primary">
+                  Are you sure you want to log out?
+                </h3>
+                <p className="mt-1 text-sm text-text-secondary">
+                  This will terminate all active sessions immediately.
+                </p>
               </div>
             </div>
-            <div className="flex flex-wrap gap-4">
-              <Button onClick={() => setPasswordMode('change')} className="px-8 py-4 rounded-2xl text-xs uppercase tracking-widest shadow-lg shadow-primary/20">Change Standard Password</Button>
-              <Button onClick={() => setPasswordMode('set')} variant="secondary" className="px-8 py-4 border border-text-secondary/10 font-black rounded-2xl text-xs uppercase tracking-widest hover:bg-secondary/80">Set Google Account Password</Button>
-            </div>
-          </div>
-        ) : (
-          <div className="animate-in slide-in-from-top-4 duration-300">
-            <h3 className="text-xl font-black text-text-primary mb-8 flex items-center gap-3 capitalize">
-              <ShieldCheck className="text-primary" /> {passwordMode === 'change' ? "Update Password" : "Set Google Password"}
-            </h3>
-
-            {error && <Alert variant="alert" className="mb-6 text-xs font-bold">{error}</Alert>}
-
-            <div className="space-y-6 max-w-md">
-              {passwordMode === 'change' && (
-                <PasswordInput label="Current Password" value={passwordForm.current} isVisible={showPass.current} onToggle={() => setShowPass({ ...showPass, current: !showPass.current })} onChange={(e) => setPasswordForm({ ...passwordForm, current: e.target.value })} />
-              )}
-              <PasswordInput label="New Password" value={passwordForm.new} isVisible={showPass.new} onToggle={() => setShowPass({ ...showPass, new: !showPass.new })} onChange={(e) => setPasswordForm({ ...passwordForm, new: e.target.value })} />
-              <PasswordInput label="Confirm New Password" value={passwordForm.confirm} isVisible={showPass.confirm} onToggle={() => setShowPass({ ...showPass, confirm: !showPass.confirm })} onChange={(e) => setPasswordForm({ ...passwordForm, confirm: e.target.value })} />
-
-              <div className="flex gap-4 pt-6">
-                <Button onClick={() => { setPasswordMode(null); setError(null); }} variant="ghost" className="flex-1 py-4 text-xs font-black text-text-secondary hover:bg-text-primary/5 rounded-2xl uppercase tracking-widest">Cancel</Button>
-                <Button onClick={handlePasswordSubmit} disabled={isSaving} isLoading={isSaving} className="flex-1 py-4 rounded-2xl text-xs shadow-lg uppercase tracking-widest gap-2">
-                  <Check size={16} /> Update Security
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-      </Card>
-
-      {/* Active Sessions */}
-      <Card className="rounded-[40px] p-10 shadow-sm">
-        <div className="flex justify-between items-center mb-10">
-          <h3 className="text-2xl font-black text-text-primary">Logged-in Sessions</h3>
-          <Button onClick={fetchSessions} variant="ghost" size="icon" className="text-primary hover:rotate-180 duration-500"><ShieldCheck size={20} /></Button>
-        </div>
-        <div className="grid gap-4">
-          {loadingSessions ? (
-            <div className="p-10 text-center"><Spinner className="mx-auto text-primary" /></div>
-          ) : sessions.length === 0 ? (
-            <p className="p-10 text-center text-text-secondary font-bold bg-background rounded-3xl">No other active devices found.</p>
-          ) : sessions.map((s) => (
-            <div key={s.id as string} className="flex items-center justify-between p-6 bg-background border border-text-secondary/10 rounded-[28px] hover:border-primary/40 transition-all group">
-              <div className="flex items-center gap-6">
-                <div className="p-4 bg-bg-primary rounded-2xl border border-text-secondary/5 text-text-primary group-hover:bg-primary group-hover:text-white transition-colors">
-                  {(s.device_id as string)?.toLowerCase().includes('phone') ? <Smartphone size={24} /> : <Laptop size={24} />}
-                </div>
-                <div>
-                  <p className="font-black text-text-primary text-lg tracking-tight uppercase">{(s.device_id as string) || "Unknown Device"}</p>
-                  <p className="text-[11px] text-text-secondary font-black uppercase tracking-widest mt-1 opacity-60">
-                    Connected: {new Date(s.created_at as string).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-              <Button onClick={() => handleRevokeSession(s.id as string)} variant="ghost" size="icon" className="p-3 text-text-secondary hover:text-white hover:bg-red-500 rounded-xl shadow-sm">
-                <X size={20} />
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Button variant="outline" onClick={() => setShowLogoutConfirm(false)}>
+                Cancel
+              </Button>
+              <Button variant="alert" isLoading={isSaving} onClick={handleLogoutAll}>
+                Yes, Log Out All
               </Button>
             </div>
-          ))}
+          </Card>
         </div>
-      </Card>
+      )}
 
-      {/* Danger Zone */}
-      <Card className="bg-red-500/5 rounded-[40px] border border-red-500/10 p-10 border-dashed">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <h3 className="text-2xl font-black text-red-600 mb-2 flex items-center gap-3"><AlertCircle /> Global Sign Out</h3>
-            <p className="text-sm text-text-secondary font-medium">This will immediately revoke access from all devices and require re-login.</p>
+      {error && <Alert variant="alert">{error}</Alert>}
+
+      <div>
+        <h2 className="text-5xl font-black text-text-primary tracking-tight">Security Settings</h2>
+        <p className="mt-2 text-base text-text-secondary">
+          Manage your authentication methods and monitor active sessions across all devices.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6">
+        <Card className="rounded-2xl p-6 border-text-secondary/20">
+          <div className="flex items-center gap-3">
+            <KeyRound size={18} className="text-primary" />
+            <h3 className="text-xl font-black text-text-primary">Password & Authentication</h3>
           </div>
-          <Button onClick={handleLogoutAll} disabled={isSaving} variant="alert" isLoading={isSaving} className="px-10 py-5 rounded-[24px] text-xs uppercase tracking-widest shadow-xl shadow-red-500/30 hover:bg-red-700">
-            Sign Out All Devices
+          <p className="mt-3 text-sm text-text-secondary leading-relaxed">
+            Ensure a strong, unique password. Update your standard password or set one for social-login account access.
+          </p>
+
+          <div className="mt-5 space-y-3">
+            <Button
+              variant={passwordAction === "change" ? "primary" : "outline"}
+              className="w-full justify-between"
+              onClick={() => setPasswordAction("change")}
+            >
+              <span className="inline-flex items-center gap-2">
+                <Shield size={14} />
+                Change Password
+              </span>
+              <span className="text-xs opacity-80">Standard Account</span>
+            </Button>
+
+            <Button
+              variant={passwordAction === "set" ? "primary" : "outline"}
+              className="w-full justify-between"
+              onClick={() => setPasswordAction("set")}
+            >
+              <span className="inline-flex items-center gap-2">
+                <Link2 size={14} />
+                Set Password for Google Account
+              </span>
+              <span className="text-xs opacity-80">OAuth Linked</span>
+            </Button>
+          </div>
+        </Card>
+
+        <Card className="rounded-2xl p-6 border-text-secondary/20">
+          <h3 className="text-lg font-black text-text-primary">
+            {passwordAction === "change" ? "Change Password" : "Set Password"}
+          </h3>
+          <p className="mt-1 text-sm text-text-secondary">
+            {passwordAction === "change"
+              ? "Enter current and new password."
+              : "Create a password for your linked Google account."}
+          </p>
+
+          <div className="mt-5 space-y-4">
+            {passwordAction === "change" && (
+              <PasswordField
+                label="Current Password"
+                value={passwordForm.current}
+                visible={showPass.current}
+                onToggle={() => setShowPass((prev) => ({ ...prev, current: !prev.current }))}
+                onChange={(value) => setPasswordForm((prev) => ({ ...prev, current: value }))}
+              />
+            )}
+            <PasswordField
+              label="New Password"
+              value={passwordForm.next}
+              visible={showPass.next}
+              onToggle={() => setShowPass((prev) => ({ ...prev, next: !prev.next }))}
+              onChange={(value) => setPasswordForm((prev) => ({ ...prev, next: value }))}
+            />
+            <PasswordField
+              label="Confirm Password"
+              value={passwordForm.confirm}
+              visible={showPass.confirm}
+              onToggle={() => setShowPass((prev) => ({ ...prev, confirm: !prev.confirm }))}
+              onChange={(value) => setPasswordForm((prev) => ({ ...prev, confirm: value }))}
+            />
+          </div>
+
+          <Button className="mt-6 w-full" onClick={handlePasswordSubmit} isLoading={isSaving}>
+            Save Password Settings
+          </Button>
+        </Card>
+      </div>
+
+      <Card className="rounded-2xl p-6 border-text-secondary/20">
+        <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h3 className="text-xl font-black text-text-primary">Active Sessions</h3>
+            <p className="mt-1 text-sm text-text-secondary">
+              Review devices currently signed into your account.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={fetchSessions}>
+              Refresh
+            </Button>
+            <Button
+              variant="outline"
+              className="border-red-300 text-red-700 hover:bg-red-50"
+              onClick={handleRevokeAllSessions}
+              isLoading={isSaving}
+            >
+              Revoke All Sessions
+            </Button>
+            {sessions.length > 2 && (
+              <Button variant="secondary" onClick={() => setShowAllSessions((prev) => !prev)}>
+                {showAllSessions ? "View Less" : "View All"}
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {loadingSessions ? (
+          <div className="py-12 text-center">
+            <Spinner className="mx-auto text-primary" />
+          </div>
+        ) : visibleSessions.length === 0 ? (
+          <p className="rounded-xl bg-secondary px-4 py-10 text-center text-sm text-text-secondary">
+            No active sessions found.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {visibleSessions.map((session) => {
+              const id = String((session as { id?: string }).id ?? "");
+              const device = String((session as { device_id?: string }).device_id ?? "Unknown Device");
+              const userAgent = String((session as { user_agent?: string }).user_agent ?? "");
+              const ipAddress = String((session as { ip_address?: string }).ip_address ?? "-");
+              const location = String((session as { location?: string }).location ?? "-");
+              const isPhone = device.toLowerCase().includes("phone");
+
+              return (
+                <div
+                  key={id}
+                  className="grid grid-cols-1 gap-4 rounded-xl border border-text-secondary/10 bg-background p-4 md:grid-cols-[minmax(0,1fr)_140px_140px_120px]"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="rounded-lg bg-bg-primary p-2 text-text-primary">
+                      {isPhone ? <Smartphone size={18} /> : <Laptop size={18} />}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-black text-text-primary">{device}</p>
+                      <p className="truncate text-xs text-text-secondary">{userAgent || "Unknown agent"}</p>
+                    </div>
+                  </div>
+                  <p className="text-sm text-text-secondary">{location}</p>
+                  <p className="text-sm text-text-secondary">{ipAddress}</p>
+                  <div className="flex items-center justify-start md:justify-end">
+                    <Button
+                      variant="outline"
+                      className="border-red-300 text-red-700 hover:bg-red-50"
+                      onClick={() => handleRevokeSession(id)}
+                    >
+                      <Trash2 size={14} />
+                      Revoke
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="mt-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-t border-text-secondary/10 pt-5">
+          <div>
+            <p className="text-sm font-semibold text-text-primary">Precautionary Measures</p>
+            <p className="text-xs text-text-secondary">
+              Immediately terminate all active tokens except this session.
+            </p>
+          </div>
+          <Button variant="alert" onClick={() => setShowLogoutConfirm(true)} leftIcon={<LogOut size={14} />}>
+            Logout of All Devices
           </Button>
         </div>
       </Card>
@@ -185,26 +386,32 @@ export default function SecuritySettingsPage() {
   );
 }
 
-function PasswordInput({ label, isVisible, onToggle, ...props }: {
+function PasswordField({
+  label,
+  value,
+  visible,
+  onToggle,
+  onChange,
+}: {
   label: string;
-  isVisible: boolean;
+  value: string;
+  visible: boolean;
   onToggle: () => void;
-} & React.InputHTMLAttributes<HTMLInputElement>) {
+  onChange: (value: string) => void;
+}) {
   return (
-    <div className="w-full">
-      <label className="block text-[10px] font-black text-text-secondary mb-3 uppercase tracking-[0.2em]">{label}</label>
+    <div>
+      <label className="mb-2 block text-xs font-semibold text-text-primary">{label}</label>
       <Input
-        {...props}
-        type={isVisible ? "text" : "password"}
-        className="px-6 py-5 border-2 bg-background border-text-secondary/10 rounded-[24px] text-base font-black text-text-primary shadow-sm"
+        type={visible ? "text" : "password"}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        variant="filled"
+        className="rounded-xl"
         placeholder="••••••••"
         rightNode={
-          <button
-            type="button"
-            onClick={onToggle}
-            className="text-text-secondary hover:text-primary transition-colors"
-          >
-            {isVisible ? <EyeOff size={20} /> : <Eye size={20} />}
+          <button type="button" onClick={onToggle} className="text-text-secondary hover:text-primary">
+            {visible ? <EyeOff size={18} /> : <Eye size={18} />}
           </button>
         }
       />

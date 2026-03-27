@@ -160,7 +160,7 @@ export default function KeywordStrategyPage() {
             placeholder="Search keywords..."
             className="w-64 border-text-secondary/10 rounded-lg"
             variant="filled"
-            size="sm"
+            fieldSize="sm"
           />
           <Input
             value={newKeyword}
@@ -168,14 +168,14 @@ export default function KeywordStrategyPage() {
             placeholder="New keyword..."
             className="flex-1 border-text-secondary/10 rounded-lg"
             variant="filled"
-            size="sm"
+            fieldSize="sm"
           />
           <Select
             value={newType}
             onChange={(e) => setNewType((e.target.value === 'secondary' ? 'secondary' : 'primary'))}
             className="border-text-secondary/10 rounded-lg"
             variant="filled"
-            size="sm"
+            fieldSize="sm"
           >
             <option value="primary">Primary</option>
             <option value="secondary">Secondary</option>
@@ -223,7 +223,7 @@ export default function KeywordStrategyPage() {
                             onChange={(e) => setEditKeyword(e.target.value)}
                             className="w-full border-text-secondary/20 rounded-md"
                             variant="filled"
-                            size="sm"
+                            fieldSize="sm"
                           />
                         ) : (
                           <span className="text-sm font-semibold text-text-primary">{kw.keyword}</span>
@@ -236,7 +236,7 @@ export default function KeywordStrategyPage() {
                             onChange={(e) => setEditType((e.target.value === 'secondary' ? 'secondary' : 'primary'))}
                             className="border-text-secondary/20 rounded-md"
                             variant="filled"
-                            size="sm"
+                            fieldSize="sm"
                           >
                             <option value="primary">Primary</option>
                             <option value="secondary">Secondary</option>

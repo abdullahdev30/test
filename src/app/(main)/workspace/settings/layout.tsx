@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { UserCircle, Key, Users } from 'lucide-react';
+import { UserCircle, Key } from 'lucide-react';
 import { Card } from '@/components/common';
 
 export default function WorkspaceSettingsLayout({
@@ -22,7 +22,7 @@ export default function WorkspaceSettingsLayout({
     <div className="max-w-7xl mx-auto p-8 font-sans h-full">
       <div className="mb-8">
         <h1 className="text-3xl font-semibold text-text-primary tracking-tight">Workspace Settings</h1>
-        <p className="text-text-secondary text-sm mt-1">Manage your business profile, keywords, and team access.</p>
+        <p className="text-text-secondary text-sm mt-1">Manage your business profile and keyword strategy.</p>
       </div>
 
       <div className="flex flex-col md:flex-row gap-8 items-start">

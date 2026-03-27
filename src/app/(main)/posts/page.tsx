@@ -400,7 +400,7 @@ function StatusIndicator({ post }: { post: PostItem }) {
   }
 
   if (isScheduled(post)) {
-    return <Flag size={12} className="text-amber-500" title="Scheduled" />;
+    return <Flag size={12} className="text-amber-500" aria-label="Scheduled" />;
   }
 
   if (isDraft(post)) {

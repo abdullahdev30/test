@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { 
   Instagram, Facebook, Linkedin, Globe, 
   Link as LinkIcon, Link2Off, AlertCircle, RefreshCw, CheckCircle2, X 
@@ -19,10 +18,10 @@ const PLATFORMS = [
 export default function SocialConnections() {
   const { loading, statusData, error, isConnected, connect, disconnect, refreshAll } = useSocial();
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
-  const searchParams = useSearchParams();
 
   // 1. Handle Hydration & URL Notifications
   useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
     const success = searchParams.get('success');
     const err = searchParams.get('error');
 
@@ -39,7 +38,7 @@ export default function SocialConnections() {
 
     const t = setTimeout(() => setToast(null), 5000);
     return () => clearTimeout(t);
-  }, [searchParams, refreshAll]);
+  }, [refreshAll]);
 
   return (
     <section className="p-6 md:p-10 bg-[var(--background)] min-h-screen relative">

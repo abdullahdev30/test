@@ -19,12 +19,19 @@ const baseFieldStyles =
   'w-full rounded-xl border outline-none text-text-primary transition-colors focus:ring-2 focus:ring-primary/40';
 
 type SharedFieldProps = {
-  size?: FieldSize;
+  fieldSize?: FieldSize;
   variant?: FieldVariant;
   leftIcon?: React.ReactNode;
   rightNode?: React.ReactNode;
   containerClassName?: string;
 };
+
+type InputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'> &
+  SharedFieldProps;
+type TextareaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement> &
+  Omit<SharedFieldProps, 'leftIcon' | 'rightNode'>;
+type SelectProps = Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'size'> &
+  Omit<SharedFieldProps, 'leftIcon' | 'rightNode'>;
 
 export function Label({
   className,
@@ -33,17 +40,29 @@ export function Label({
   return <label className={cn('mb-2 block text-xs font-semibold text-text-primary', className)} {...props} />;
 }
 
-export function Input({
-  className,
-  size = 'md',
-  variant = 'default',
-  leftIcon,
-  rightNode,
-  containerClassName,
-  ...props
-}: React.InputHTMLAttributes<HTMLInputElement> & SharedFieldProps) {
+export const Input = React.forwardRef<
+  HTMLInputElement,
+  InputProps
+>(function Input(
+  {
+    className,
+    fieldSize = 'md',
+    variant = 'default',
+    leftIcon,
+    rightNode,
+    containerClassName,
+    ...props
+  },
+  ref,
+) {
   if (!leftIcon && !rightNode) {
-    return <input className={cn(baseFieldStyles, sizeStyles[size], variantStyles[variant], className)} {...props} />;
+    return (
+      <input
+        ref={ref}
+        className={cn(baseFieldStyles, sizeStyles[fieldSize], variantStyles[variant], className)}
+        {...props}
+      />
+    );
   }
 
   return (
@@ -54,12 +73,13 @@ export function Input({
         </span>
       )}
       <input
+        ref={ref}
         className={cn(
           baseFieldStyles,
-          sizeStyles[size],
+          sizeStyles[fieldSize],
           variantStyles[variant],
-          leftIcon && 'pl-12',
-          rightNode && 'pr-12',
+          Boolean(leftIcon) && 'pl-12',
+          Boolean(rightNode) && 'pr-12',
           className,
         )}
         {...props}
@@ -67,34 +87,37 @@ export function Input({
       {rightNode && <span className="absolute right-3 top-1/2 -translate-y-1/2">{rightNode}</span>}
     </div>
   );
-}
+});
 
-export function Textarea({
-  className,
-  size = 'md',
-  variant = 'default',
-  ...props
-}: React.TextareaHTMLAttributes<HTMLTextAreaElement> & Omit<SharedFieldProps, 'leftIcon' | 'rightNode'>) {
+export const Textarea = React.forwardRef<
+  HTMLTextAreaElement,
+  TextareaProps
+>(function Textarea({ className, fieldSize = 'md', variant = 'default', ...props }, ref) {
   return (
     <textarea
-      className={cn(baseFieldStyles, sizeStyles[size], variantStyles[variant], 'min-h-[120px] resize-y', className)}
+      ref={ref}
+      className={cn(baseFieldStyles, sizeStyles[fieldSize], variantStyles[variant], 'min-h-[120px] resize-y', className)}
       {...props}
     />
   );
-}
+});
 
-export function Select({
-  className,
-  size = 'md',
-  variant = 'default',
-  ...props
-}: React.SelectHTMLAttributes<HTMLSelectElement> & Omit<SharedFieldProps, 'leftIcon' | 'rightNode'>) {
-  return <select className={cn(baseFieldStyles, sizeStyles[size], variantStyles[variant], className)} {...props} />;
-}
+export const Select = React.forwardRef<
+  HTMLSelectElement,
+  SelectProps
+>(function Select({ className, fieldSize = 'md', variant = 'default', ...props }, ref) {
+  return (
+    <select
+      ref={ref}
+      className={cn(baseFieldStyles, sizeStyles[fieldSize], variantStyles[variant], className)}
+      {...props}
+    />
+  );
+});
 
-export function Checkbox({
-  className,
-  ...props
-}: React.InputHTMLAttributes<HTMLInputElement>) {
-  return <input type="checkbox" className={cn('h-4 w-4 accent-primary', className)} {...props} />;
-}
+export const Checkbox = React.forwardRef<
+  HTMLInputElement,
+  React.InputHTMLAttributes<HTMLInputElement>
+>(function Checkbox({ className, ...props }, ref) {
+  return <input ref={ref} type="checkbox" className={cn('h-4 w-4 accent-primary', className)} {...props} />;
+});

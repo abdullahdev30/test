@@ -119,14 +119,46 @@ export async function getSessions() {
 
   try {
     const data = await http.get('/auth/sessions', token);
-    return { success: true, sessions: Array.isArray(data) ? data : [] };
+    const sessions =
+      Array.isArray(data)
+        ? data
+        : Array.isArray((data as { sessions?: unknown[] })?.sessions)
+          ? ((data as { sessions?: unknown[] }).sessions as unknown[])
+          : [];
+
+    const sessionIds = sessions
+      .map((session) =>
+        session && typeof session === 'object'
+          ? String((session as { id?: string }).id ?? '')
+          : '',
+      )
+      .filter(Boolean);
+
+    const cookieStore = await cookies();
+    if (sessionIds.length > 0 && !cookieStore.get('session_ids')?.value) {
+      cookieStore.set('session_ids', sessionIds.join(','), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 60 * 60 * 24 * 7,
+      });
+    }
+
+    return { success: true, sessions };
   } catch (err: unknown) {
     if (isUnauthorizedError(err)) {
       const refreshed = await getValidToken({ forceRefresh: true });
       if (refreshed) {
         try {
           const data = await http.get('/auth/sessions', refreshed);
-          return { success: true, sessions: Array.isArray(data) ? data : [] };
+          const sessions =
+            Array.isArray(data)
+              ? data
+              : Array.isArray((data as { sessions?: unknown[] })?.sessions)
+                ? ((data as { sessions?: unknown[] }).sessions as unknown[])
+                : [];
+          return { success: true, sessions };
         } catch {
           // fall through to standard error handling
         }
@@ -168,7 +200,11 @@ export async function logoutAll() {
 
   try {
     if (token) {
-      await http.post('/auth/logout-all', {}, token);
+      try {
+        await http.delete('/auth/sessions', token);
+      } catch {
+        await http.post('/auth/logout-all', {}, token);
+      }
     }
   } catch {
     // Best-effort
@@ -186,6 +222,7 @@ export async function logoutAll() {
   cookieStore.set('access_token', '', cookieOpts);
   cookieStore.set('refresh_token', '', cookieOpts);
   cookieStore.set('platform_connections', '', cookieOpts);
+  cookieStore.set('session_ids', '', cookieOpts);
 
   return { success: true };
 }
